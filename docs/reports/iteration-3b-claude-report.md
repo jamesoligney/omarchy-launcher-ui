@@ -94,3 +94,51 @@ This matches the closed-form model. Debug line removed afterwards (0 matches), s
 ## Not verified
 
 Feel. I cannot judge it by eye. The levers, in order: Y/X start values (travel), ζ (0.40 / 0.46; lower is boingier, ~0.25 starts to look cartoonish), and ω (higher is snappier).
+
+---
+
+# Same animation on the emoji and clipboard pickers (2026-11-23)
+
+## What changed
+
+The launcher's open and close motion is now one shared component, not three copies.
+
+- **New:** `~/.config/omarchy/plugins/jimmy.shared/CardMotion.qml` holds the whole motion: the exact damped-oscillator springs (X: start 0.80, ω 24, ζ 0.40; Y: start 0.70, ω 20, ζ 0.46), the 160 ms fade, and the 100 ms close to 0.97. It exposes `play()`, `hide()`, `stop()` and `xScale`/`yScale`.
+- **`jimmy.menu/Menu.qml`:** its inline `springT`, `spring()`, `openAnim` and `closeAnim` were removed and replaced by `CardMotion { id: motion }`. Behaviour is unchanged (re-traced, below).
+- **`jimmy.emojis/Emojis.qml` and `jimmy.clipboard/Clipboard.qml`:** the old `0.96 → 1.0` OutCubic zoom and 140 ms fade are gone. Each card gets the same `Scale` transform bound to `motion.xScale/yScale`, and each plugin uses `CardMotion`.
+- All three import it by relative path, `import "../jimmy.shared"`.
+
+## Behaviour changes you should know about
+
+- **The pickers had no close animation before.** The layer vanished on dismiss. To give them the launcher's close, each now has a `closing` flag and a 115 ms `closeTimer` (the launcher's mechanism), so the layer outlives `opened` while the 100 ms close plays.
+- **Keyboard focus is released at once.** `shownKeyboardFocus` is `Exclusive` only while `opened`, `None` while closing. Without that, a paste fired on dismiss would have reached the fading picker for 115 ms instead of the app underneath. Both pickers dismiss then paste immediately.
+- Reopening during the close cancels it and replays the open.
+
+## Verified live (trace on a real open, `omarchy restart shell` only)
+
+Same X / Y / card opacity at matching times in all three:
+
+| t (ms) | launcher | emojis | clipboard |
+|---|---|---|---|
+| ~11 | 0.800 / 0.700 | 0.8000 / 0.7000 | 0.8000 / 0.7000 |
+| ~43 | 0.879 / 0.785 (52) | 0.8540 / 0.7577 | 0.8540 / 0.7577 |
+| ~143 | 1.047 / 1.022 (135) | 1.0496 / 1.0320 (X peak) | 1.0496 / 1.0320 |
+| ~176 | 1.043 / 1.058 (Y peak) | 1.0431 / 1.0579 | 1.0431 / 1.0579 |
+| ~309 | 0.987 / 0.999 (X trough) | 0.9879 / 0.9967 | 0.9879 / 0.9967 |
+| ~676 | 1.000 / 1.000 | 1.0001 / 0.9997 | 1.0001 / 0.9997 |
+
+Card opacity reaches 1.00 by ~143 ms in the pickers. Close on the clipboard picker: scale `1.0000 → 0.9700` and opacity `1.00 → 0.03` across the 100 ms, after which the layer is hidden. All debug logging was removed (`grep ANIMDEBUG` returns 0 in every file); emoji picker still opens after the final restart.
+
+## Not verified
+
+- **Close on the emoji picker and the launcher was not re-traced.** They use the same component and the same hook; only the clipboard close was traced.
+- **A real paste after a dismiss.** I cannot press keys or paste here, so the focus release is reasoned, not observed. Worth one real emoji insert and one clipboard paste.
+- **Feel**, as before.
+
+## Duplication
+
+None of the motion values are duplicated. The remaining per-plugin code is the `closing` flag, the 115 ms timer and the `Scale` transform (about 15 lines each in the two pickers). The launcher has its own equivalent.
+
+## Coupling note
+
+The three plugins now depend on `jimmy.shared` being present. It has no manifest and no entry point, so it is not a plugin itself. The shell logs "Local plugin changed, reloading: jimmy.shared" when it is edited, which is harmless. These files live under `~/.config/omarchy/plugins/` and are not tracked in this repo.
