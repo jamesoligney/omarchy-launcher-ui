@@ -178,3 +178,28 @@ Synthetic keys via `wtype`, a temporary log on the filter property, and `grim` s
 - **Shift+Tab as `wtype -M shift -k Tab`** stepped forward, so the handler also treats Tab with the Shift modifier as backward, but I could not confirm that path. Please press a real Shift+Tab once.
 - **Typing after a chip key in the clipboard picker** was not tested; the emoji picker was.
 - **How the hints look.** I looked at the screenshots but cannot judge the design for you.
+
+---
+
+# Chip shortcuts moved from Ctrl to Option (2026-11-23)
+
+Both pickers now switch chips with **Option (Alt) + number** instead of Ctrl + number. Hints on the chips read `⌥N` instead of `⌃N`.
+
+- **Clipboard:** `⌥1` All, `⌥2` Text, `⌥3` Images, `⌥4` Files.
+- **Emoji:** `⌥1` All, `⌥2` to `⌥9` Smileys, People, Animals, Food, Travel, Activities, Objects, Symbols, `⌥0` Flags.
+- `Tab` / `Shift+Tab` (and Left/Right in the clipboard picker) are unchanged.
+- Code: the modifier check is now `Qt.AltModifier` and the hint glyph is `⌥`, in `Clipboard.qml` and `Emojis.qml`. Nothing else changed. On Linux, Option is the Alt key.
+- Checked first that no Hyprland bind uses Alt plus a digit (`hyprctl binds`: none), so the keys reach the picker.
+
+## Verified live
+
+One `omarchy restart shell`, then one open per picker, `wtype -M alt <digit>`, and screenshots of the chip row. No debug logging was added this time.
+
+- Clipboard: `⌥3` highlights Images, then `⌥2` highlights Text. All four chips show `⌥1` to `⌥4`.
+- Emoji: `⌥5` highlights Food, `⌥0` highlights Flags. All ten chips show `⌥1` to `⌥9` and `⌥0`; the row fits inside the card.
+
+## Not verified
+
+- `⌥1` and `⌥4` (clipboard) and the other emoji keys were not pressed individually; they share the one handler that `⌥2`, `⌥3`, `⌥5` and `⌥0` went through.
+- Typing into the search field after an Option key press, in either picker.
+- A real keyboard rather than `wtype`, in particular whether Option on the Mac keyboard layout reaches the app as Alt.
