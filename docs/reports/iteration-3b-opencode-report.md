@@ -8,11 +8,24 @@ Scope: **Part B** (emoji picker, clipboard picker, bar widgets) and **Part C** (
 
 ## Summary
 
-- The emoji and clipboard pickers were cloned to user plugins (`jimmy.emojis`, `jimmy.clipboard`), rebuilt to Vicinae parity, given the launcher's design tokens, and surfaced as bar widgets in the tray.
-- The launcher's open animation was **fixed**. The v2 code was present but its bounce was mathematically invisible. It is now an explicit overshoot-then-settle spring, verified live with a scale trace and a screen recording.
+- The emoji and clipboard pickers were cloned to user plugins (`jimmy.emojis`, `jimmy.clipboard`), rebuilt to Vicinae parity, and given the launcher's design tokens. They are reachable by `Super+Ctrl+E` / `Super+Ctrl+V` (no bar icons).
+- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **retuned to a springier `0.96 → 1.08 → 1.0`** per James's live check, verified with a scale trace and a screen recording.
+- Glass opacity was lowered from `0.84` to `0.70` so the wallpaper shows through the launcher and both pickers more clearly.
 - `emojis.json` (dead, superseded by `emoji-data.json`) was removed from the emoji clone after confirming nothing references it.
 
 No stock files under `/usr/share/omarchy` were edited. Reload was `omarchy restart shell` only — **never** `omarchy refresh shell`.
+
+---
+
+## Tuning round (James's live check)
+
+Three follow-up changes, made and verified after James looked at the build live:
+
+1. **Animation — springier.** The first fix (`0.96 → 1.04 → 1.0`) read as mechanical: the two `Easing.OutCubic` stages met at a velocity kink (the zoom ended at zero velocity and the settle began at full velocity), so it stepped rather than sprang. Retuned to `card.scale 0.96 → 1.08` (150 ms `OutCubic`) then `1.08 → 1.0` (140 ms `InOutQuad`). The overshoot peak is now **1.08** (was 1.04), and `InOutQuad` starts the settle at zero velocity, so the two stages join smoothly and read as one spring return. Close stays fast (unchanged).
+2. **Glass — more transparent.** Lowered `panel-background-alpha` from `0.84` to `0.70` in `~/.config/omarchy/shell.toml`. This is the single token the launcher and both pickers read, so all three now let more wallpaper (and blur) through.
+3. **Bar icons — removed.** `jimmy.emojis` and `jimmy.clipboard` were removed from the bar tray, and both plugins were reverted to pure overlays (`kinds: ["overlay"]`, `BarWidget.qml` deleted). They remain reachable by `Super+Ctrl+E` / `Super+Ctrl+V`.
+
+Verification of the retuned animation (scale trace on a live open): `0.960 → … → 1.080 → 1.079 → 1.078 → … → 1.000`, then close `1.000 → 0.998 → … → 0.982`. The settle's first frames (`1.080 → 1.079 → 1.078`) confirm it begins at rest, unlike the previous `1.040 → 1.029` jump.
 
 ---
 
@@ -48,9 +61,9 @@ Cloned `omarchy.emojis` → `~/.config/omarchy/plugins/jimmy.emojis/` (stock sou
 |---|---|
 | `emoji-data.json` | **New**, generated at build time (build script not committed). Merges the 1,870 stock emojis with ~96 curated typographic symbols; each item carries a 9-way category (`smileys`, `people`, `animals`, `food`, `travel`, `activities`, `objects`, `symbols`, `flags`) and a `t` (`emoji`/`symbol`) flag. `em dash` → `—`, plus `⌘`, `→`, `•`, `–`, etc. |
 | `EmojiSearch.js` | Rewritten. `parseData` precomputes a lowercased searchable string per item (glyph + keywords + category) so filtering is one `indexOf` scan per term. `search()` does multi-term AND matching with ranking (exact glyph > keyword word-boundary > prefix > substring). `byCategory()` and `orderByPinsAndRecents()` added. |
-| `Emojis.qml` | Rewritten. Reads the same `[launcher]` token block the launcher uses (theme-aware glass at 84%, radius 16), so a theme switch re-tints it. Search field, category chips, a "Recently used" strip (pins first), keyboard-navigable grid, `Ctrl+P` pin, Enter pastes via the stock `omarchy-menu-emoji-insert`. Recents/pins persist to `~/.local/state/omarchy/emoji-{recents,pins}.json`. |
-| `BarWidget.qml` | **New**. Bar icon that toggles the picker. |
-| `manifest.json` | Added `bar-widget` kind + `barWidget` entry point. |
+| `Emojis.qml` | Rewritten. Reads the same `[launcher]` token block the launcher uses (theme-aware glass at 70%, radius 16), so a theme switch re-tints it. Search field, category chips, a "Recently used" strip (pins first), keyboard-navigable grid, `Ctrl+P` pin, Enter pastes via the stock `omarchy-menu-emoji-insert`. Recents/pins persist to `~/.local/state/omarchy/emoji-{recents,pins}.json`. |
+| `BarWidget.qml` | ~~New bar icon~~ **Removed** in the tuning round (reverted to a pure overlay; no tray icon). |
+| `manifest.json` | ~~Added `bar-widget` kind~~ Reverted to `kinds: ["overlay"]` in the tuning round. |
 | `emojis.json` | **Removed** (dead — superseded by `emoji-data.json`; confirmed nothing references it). |
 
 ## Part B — clipboard picker
@@ -61,12 +74,12 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 |---|---|
 | `ClipboardHistory.js` | Added compact hashed `pinKey` (text hashed, image by path), `orderByPins`, `relativeTime`/`formatTimestamp`/`sizeText`, and `capturedAtMs` timestamp preservation. `displayRows` now takes a `typeFilter` (`all`/`text`/`image`/`file`) and returns `pinKey`, `timeText`, `sizeText` per row. |
 | `Clipboard.qml` | Rewritten. Launcher tokens (glass, radius 16). Type-filter chips (All/Text/Images/Files). **Pause** button that stops the `wl-paste` watchers and persists to `~/.local/state/omarchy/clipboard-paused`. Pin button in the detail pane + `Ctrl+P`. Detail pane now shows Type / Size / Copied-at. Open animation added. Paste/copy/open/delete/clear paths unchanged (stock binaries). |
-| `BarWidget.qml` | **New**. Bar icon that toggles the picker. |
-| `manifest.json` | Added `bar-widget` kind + `barWidget` entry point. |
+| `BarWidget.qml` | ~~New bar icon~~ **Removed** in the tuning round (reverted to a pure overlay; no tray icon). |
+| `manifest.json` | ~~Added `bar-widget` kind~~ Reverted to `kinds: ["overlay"]` in the tuning round. |
 
 ## Bar widgets (B4)
 
-- `~/.config/omarchy/shell.json` — placed `jimmy.emojis` and `jimmy.clipboard` in the bar tray after `jimmy.menu` (via `omarchy bar put`); `omarchy.emojis`/`omarchy.clipboard` moved to `disabledPlugins`; `cloneSourceRestores` updated. Backup: `shell.json.bak.3b-1795466486`.
+- ~~Placed `jimmy.emojis` and `jimmy.clipboard` in the bar tray~~ **Removed** in the tuning round: James runs the pickers by keyboard and does not want tray icons. `jimmy.emojis`/`jimmy.clipboard` stay enabled as pure overlays; `omarchy.emojis`/`omarchy.clipboard` remain in `disabledPlugins`. Backup: `shell.json.bak.3b-1795466486`.
 - `~/.config/hypr/menu-glass.lua` — extended the blur layer rule from `omarchy-menu` to `^(omarchy-menu|omarchy-emojis|omarchy-clipboard)$` so both pickers get the launcher's glass blur. Applied with `hyprctl reload`.
 
 ---
@@ -77,9 +90,9 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 - Emoji picker opens and renders a populated grid (colorful glyph pixels detected in the card region).
 - `em dash` → `—`, glyph-character search, category counts, and pin/recency ordering all pass in Node against the real `emoji-data.json`.
 - Clipboard picker opens and renders the list (bright text pixels + accent).
-- Bar widgets are registered (`inBar=True`) and render in the tray.
 - **Theme re-tint:** card glass background shifted Afterburn `(14,15,13)` → Catppuccin `(30,30,45)` on `omarchy theme set catppuccin`, then returned on switch back to Afterburn.
-- **Animation bounce:** scale trace `0.96 → 1.04 → 1.0` (journal) and card-width growth past full then settle (screen recording).
+- **Animation bounce:** scale trace `0.96 → 1.08 → 1.0` (journal) and card-width growth past full then settle (screen recording). Retuned trace (peak `1.080`, zero-velocity settle start) recorded after the tuning round.
+- **Glass:** lowering `panel-background-alpha` to `0.70` shifted the emoji card background from `(14,15,13)` to `(15,16,15)` — more wallpaper bleeding through.
 - `emojis.json` removal did not break the picker (grid still renders after removal).
 
 ## What I did NOT verify
@@ -91,15 +104,14 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 
 ## What still needs James to check by eye
 
-1. **The bounce** — does it read as subtle-but-visible and not cartoonish? The overshoot peak is 1.04 (4% past full) over ~240 ms; easy to tune (the two `to`/`duration` values in `openAnim`) if he wants more or less.
+1. **The bounce** — does it read as a spring and not cartoonish? The overshoot peak is 1.08 (8% past full, ~290 ms); easy to tune (the two `to`/`duration` values in `openAnim`) if he wants more or less.
 2. **The pickers' look** — glass/radius-16/blur and layout of the emoji grid + clipboard list/detail.
-3. **The two bar icons** — `󰈉` (emoji) and `󰅌` (clipboard) in the tray, next to the launcher.
-4. **Paste, pin, and Pause** in real use.
+3. **Paste, pin, and Pause** in real use.
 
 ---
 
 ## Notes
 
-- A prior agent (Claude) was editing `jimmy.menu` for Part A around 12:42–12:44 while this work began; those changes are in `jimmy.menu/Menu.qml` and `Launcher.js` and are described in `iteration-3b-claude-report.md`. This report's only `jimmy.menu` change is the `openAnim` block.
+- A prior agent (Claude) was editing `jimmy.menu` for Part A around 12:42–12:44 while this work began; those changes are in `jimmy.menu/Menu.qml` and `Launcher.js` and are described in `iteration-3b-claude-report.md`. This report's `jimmy.menu` changes are the `openAnim` block (and its retune).
 - Backups left in place: `~/.config/omarchy/shell.json.bak.3b-1795466486` and `~/.config/omarchy/plugins/jimmy.menu/Menu.qml.bak.3b-anim`.
-- The `[launcher]` token block in `~/.config/omarchy/shell.toml` was left as-is; both pickers read it unchanged, so their colors follow whatever theme is active.
+- The `[launcher]` token block in `~/.config/omarchy/shell.toml` is the shared source for the launcher and both pickers; only `panel-background-alpha` was changed (0.84 → 0.70) in the tuning round. All other colour/size tokens are read unchanged, so the pickers keep following the active theme.
