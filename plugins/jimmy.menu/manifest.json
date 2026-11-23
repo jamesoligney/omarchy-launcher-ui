@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "jimmy.menu",
+  "name": "Raycast launcher",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Raycast-style app and command launcher",
+  "kinds": [
+    "menu",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Menu.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Raycast launcher",
+    "description": "Launches the Raycast-style app and command launcher",
+    "category": "Compositor",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.menu"
+  }
+}

@@ -314,3 +314,48 @@ One `omarchy restart shell` per code change (two in total), real opens of the em
 - **Enter on a strip item.** I did not press it: it pastes into the focused window, which here is this session. It goes through the same `activateGlyph` the strip click already used.
 - **A long strip** (many recents) scrolling horizontally with Left / Right. Only two items existed; the scroll call is `positionViewAtIndex(..., Contain)`.
 - **Feel and the look of the boxes** beyond what the screenshots show.
+
+---
+
+# Fallback snapshot of the live launcher code (2026-11-23)
+
+A copy of the live files was committed so there is a known-good point to restore. Nothing was moved or edited: SHA-256 of all 17 live files (the four plugin folders and `bindings.lua`) was taken before and after the copy and is identical, and each copied folder was diffed against its live source (identical).
+
+## Committed
+
+Under `plugins/` (copied from `~/.config/omarchy/plugins/`):
+- `jimmy.menu/`: `Menu.qml`, `Launcher.js`, `MenuModel.js`, `BarWidget.qml`, `manifest.json`, `README.md` (the plugin's own)
+- `jimmy.emojis/`: `Emojis.qml`, `EmojiSearch.js`, `emoji-data.json`, `manifest.json`
+- `jimmy.clipboard/`: `Clipboard.qml`, `ClipboardHistory.js`, `capture.sh`, `manifest.json`
+- `jimmy.shared/`: `CardMotion.qml`
+- `plugins/README.md`: says the live source is `~/.config/omarchy/plugins/` and gives the restore steps
+
+Under `config/` (copied from `~/.config/hypr/`):
+- `bindings.lua`
+- `config/README.md`: says the live source is `~/.config/hypr/bindings.lua` and gives the restore steps
+
+## Deliberately not committed
+
+- `jimmy.menu/Menu.qml.bak.3b-anim` and every other `*.bak*` file (stale backups), including the `bindings.lua.bak.*` copies.
+- Runtime state under `~/.local/state/omarchy/` (clipboard history, pins, recents, pause flag). Clipboard history can hold anything you copied, so it stays out of git.
+- `~/.config/omarchy/shell.toml` (the `[launcher]` design tokens, including the glass alpha). It was not on the list, so it is **not** in this snapshot; restoring the plugins alone will not bring back a changed token.
+
+## Restore
+
+Plugins (restore all four together; the three UIs import `../jimmy.shared`):
+
+```bash
+cp -a plugins/jimmy.menu plugins/jimmy.emojis plugins/jimmy.clipboard plugins/jimmy.shared ~/.config/omarchy/plugins/
+omarchy restart shell
+```
+
+Binds:
+
+```bash
+cp -p config/bindings.lua ~/.config/hypr/bindings.lua
+hyprctl reload
+```
+
+`cp -a` overwrites same-named files and leaves other live files in place. Back up the live `bindings.lua` first if it has binds you want to keep. `omarchy restart shell` only, never `omarchy refresh shell`.
+
+The snapshot reflects the state at the commit that adds it: the Option-key chips, Option+P pin, Option+S pause, the shared card motion, and the emoji Recently used strip changes.
