@@ -203,3 +203,70 @@ One `omarchy restart shell`, then one open per picker, `wtype -M alt <digit>`, a
 - `⌥1` and `⌥4` (clipboard) and the other emoji keys were not pressed individually; they share the one handler that `⌥2`, `⌥3`, `⌥5` and `⌥0` went through.
 - Typing into the search field after an Option key press, in either picker.
 - A real keyboard rather than `wtype`, in particular whether Option on the Mac keyboard layout reaches the app as Alt.
+
+---
+
+# One pin key, and a keyboard audit of all three UIs (2026-11-23)
+
+## 1. Pin is ⌥P everywhere
+
+- **Clipboard:** `⌥P` pins / unpins the selected item (was `Ctrl+P`). The Pin button in the detail pane now shows `⌥P` on itself.
+- **Emoji:** `⌥P` pins / unpins (was `Ctrl+P`). The emoji picker has no pin button, so the hint is in its footer.
+- `Ctrl+P` no longer does anything in either picker (checked live).
+
+## 2. Audit: every clickable element in the launcher, emoji and clipboard UIs
+
+Method: grepped every `MouseArea` / `onClicked` and every `Keys.onPressed` branch in `Menu.qml`, `Emojis.qml` and `Clipboard.qml`, and read each one. I also checked which Alt letters Hyprland owns, because Hyprland keeps those even while a picker has keyboard focus: `hyprctl binds` shows Alt + `F G H M O Z`, `Space`, `Tab`. So Option shortcuts must avoid those. `P` and `S` are free.
+
+| UI | Element | Was | Now |
+|---|---|---|---|
+| Clipboard | **Pause / Resume button** | **mouse-only** | **`⌥S`**, hint on the button (`⏸ Pause ⌥S`, `▶ Resume ⌥S`) and in the footer |
+| Clipboard | Pin button (detail pane) | `Ctrl+P` | **`⌥P`**, hint on the button |
+| Clipboard | Type chips | `⌥1`–`⌥4` (last round) | unchanged, hints on chips |
+| Clipboard | Row click = paste | Enter | unchanged |
+| Clipboard | Copy | `Shift+Enter`, listed in footer | unchanged |
+| Clipboard | **Open** | `Alt+Enter`, **not shown anywhere** | unchanged key, now in the footer as `⌥Enter open` |
+| Clipboard | Remove one | `Del`, in footer | unchanged |
+| Clipboard | **Clear history** | `Shift+Del`, **not shown anywhere**, no button | unchanged key, now in the footer as `⇧Del clear` |
+| Clipboard | Clear confirm dialog | keyboard (Enter, Esc, Tab/arrows) | unchanged |
+| Clipboard | Backdrop click closes | Esc | unchanged |
+| Emoji | Category chips | `⌥1`–`⌥0`, Tab (last round) | unchanged, hints on chips |
+| Emoji | Pin | `Ctrl+P` | **`⌥P`**, hint in footer |
+| Emoji | Grid cell click = paste | Enter | unchanged |
+| Emoji | Backdrop click closes | Esc | unchanged |
+| Emoji | Footer | `Enter paste · Ctrl+P pin · Esc close` | `Enter paste · ⌥P pin · ⌥1–0 or Tab category · Esc close` |
+| Launcher | Row click | Enter / arrows | unchanged |
+| Launcher | Uninstall app | `Del`, confirm dialog is keyboard-driven | unchanged (see below) |
+| Launcher | Create-shortcut flow | fully keyboard (pick, letter, Enter, Esc) | unchanged |
+| Launcher | Backdrop click closes | Esc | unchanged |
+| Launcher | Bar icon (launcher widget) | click | unchanged (see below) |
+
+Only one element was truly mouse-only: the clipboard **Pause** button. Two keyboard-only actions (Open, Clear history) had no on-screen hint; they now do.
+
+## 3. Deliberately not changed
+
+- **Copy, Open, Remove, Clear keep their existing keys** (`Shift+Enter`, `Alt+Enter`, `Del`, `Shift+Del`) instead of being moved to new Option letters. They are already keyboard-reachable and the natural keys for those actions; moving them would be churn. Open is `⌥Enter`, so it already follows the Option pattern. I only made them visible.
+- **Launcher `Del` to uninstall has no on-screen hint.** The launcher has no footer, and the selected row's right side is already the bind hint, so a hint would need a design decision. Flagging it rather than inventing a place.
+- **The launcher's bar icon stays mouse-only.** A bar widget is a pointer target by nature; the keyboard path to the same action is `Super+Space`.
+- **Backdrop click to dismiss** stays as a mouse affordance; `Esc` is the key.
+- **Mouse wheel scrolling** has no extra key; the list and grid already scroll with arrows, PageUp/PageDown, Home and End.
+- **The emoji pin has no button.** I did not add one; the pinned marker on the glyph is its only visual, and the footer carries `⌥P`.
+
+## Risks to know about
+
+- `⌥P` and `⌥S` are now used inside the pickers. If someone later creates an app shortcut on Alt+P or Alt+S (the launcher's create-a-bind flow), Hyprland would take the key while a picker is open. The launcher's conflict check only knows Hyprland binds, not these picker keys.
+- The footer is long on the clipboard picker (`Enter paste · ⇧Enter copy · ⌥Enter open · ⌥P pin · ⌥S pause · Del remove · ⇧Del clear · Esc close`). It fits at the current width in the screenshot; a narrower card would need it to elide or wrap.
+
+## Verified live
+
+One `omarchy restart shell`, one open of each picker, keys sent with `wtype`, screenshots of the whole card. No debug logging. Every toggle was undone, and the state files were checked afterwards: `emoji-pins.json` `[]`, `clipboard-pins.json` `[]`, `clipboard-paused` `0`.
+
+- Clipboard: `⌥S` changed the button to `▶ Resume ⌥S` (highlighted); `⌥S` again restored `⏸ Pause ⌥S`. `⌥P` changed the button to `📌 Pinned ⌥P` and marked the row; `⌥P` again unpinned. `Ctrl+P` left it unpinned. Footer is fully visible.
+- Emoji: `⌥P` pinned the selected emoji (marker and a pinned row appeared); `⌥P` again unpinned; `Ctrl+P` did nothing.
+
+## Not verified
+
+- **A real keyboard.** `wtype` only, as before; whether Option on the Mac layout arrives as Alt.
+- **Open (`⌥Enter`), Clear (`⇧Del`) and Remove (`Del`)** were not pressed (they change the user's real history). Only their footer text was checked.
+- **Launcher UI**: audited by reading the code, not by pressing keys in it this round.
+- **Typing after ⌥S or ⌥P** into the search field.
