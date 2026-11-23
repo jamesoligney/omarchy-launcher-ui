@@ -61,3 +61,36 @@ In this repo: only this report, `docs/reports/iteration-3b-claude-report.md`.
 3. Press Super+Space, go to Apps, and confirm the hints: Ghostty ⌥ G (Super+Return no longer shows on that row, per the decision), Helium ⌥ H, Muse.AI ⌥ M, Floorp ⌥ F, Orca ⌥ O, Zen ⌥ Z. 1Password should show ⌘ ⇧ / with no ⌥ K.
 4. Try "Create app shortcut": pick an app, type `m` (should be refused, Muse.AI), then a free letter, then Enter.
 5. Decide whether the letter-typing step (instead of pressing Alt+letter) is acceptable.
+
+---
+
+# Launcher animation, fresh pass (2026-11-23)
+
+## Why the earlier springs never felt like the window switch
+
+Every attempt tuned peak or damping of one uniform `scale` spring. The numbers were right but the perception was not, for three reasons:
+
+1. **Overshoot is a fraction of travel, and the travel is tiny.** ζ = 0.75 overshoots 2.8% of the distance travelled. A window moves hundreds of pixels, so that is 20+ px of visible overshoot. The launcher went 0.65 to 1.0 over a 740 px card: peak 1.0111 is about 8 px, spread over ~120 ms. Below perception.
+2. **The fade hides the rise.** The 160 ms OutCubic fade is ~70% done by 50 ms, but the spring only crosses 1.0 around 150 ms. The only part with visible motion was the overshoot, which was 1%.
+3. **Uniform scale from one spring reads as mechanical.** A real position spring moves a whole object and its neighbours at once. Equal X/Y scaling on a rectangle is one number going up and down, with no secondary motion.
+4. Qt `SpringAnimation` is also a fixed-step semi-implicit Euler integrator (numerical damping, step dependent), so ζ was only approximate.
+
+## What changed (`jimmy.menu/Menu.qml`)
+
+- Replaced `SpringAnimation` with an **exact damped oscillator** evaluated from elapsed time: `s(t) = 1 - (1-s0)·e^(-ζωt)·(cos ωd·t + ζω/ωd · sin ωd·t)`. A single linear `springT` (0 to 0.7 s) is animated; frame-rate independent, no integrator damping.
+- **Two springs, squash and stretch:** `card.transform = Scale` with separate X and Y.
+  - X: start 0.80, ω = 24, ζ = 0.40. Leads, peaks 1.050 at ~135 ms.
+  - Y: start 0.70, ω = 20, ζ = 0.46. Lags, peaks 1.058 at ~185 ms.
+  - The card therefore goes wide, then tall, then settles with a small undershoot (~0.987). Organic wobble, not three bounces: the second swing is ~1%.
+- Fade unchanged (160 ms). Close unchanged (100 ms, `card.scale` to 0.97); `card.scale` is left at 1 on open so the two compose, and an interrupted open closes without a jump.
+- Backup of the previous file: scratchpad copy `Menu.qml.pre-boink` (not in the repo).
+
+## Verified live
+
+Temporary `console.log` on a real open (`omarchy restart shell`, never `refresh`). Trace, X / Y:
+`0.805/0.706 (10 ms), 0.924/0.838 (60), 1.032/0.988 (110), 1.050/1.033 (135, X peak), 1.047/1.055 (160), 1.032/1.058 (185, Y peak), 0.990/1.017 (260), 0.987/1.003 (285, X trough), 1.003/0.989 (410), 1.000/1.000 (660)`.
+This matches the closed-form model. Debug line removed afterwards (0 matches), shell restarted again.
+
+## Not verified
+
+Feel. I cannot judge it by eye. The levers, in order: Y/X start values (travel), ζ (0.40 / 0.46; lower is boingier, ~0.25 starts to look cartoonish), and ω (higher is snappier).
