@@ -1,0 +1,268 @@
+#!/bin/bash
+# afterburn-watch: keeps Afterburn in step with the machine and the sky.
+# Long-running user service (extras/afterburn-watch.service). Acts only while
+# the active theme is afterburn or an afterburn colour edition. Three loops, one per concern:
+#   fullscreen  Hyprland socket2 events      -> afterburn quiet on|off; configreloaded -> put the heat level back
+#   power       upower (or 30s poll)         -> afterburn saver on|off (battery = on)
+#   heat        every 60s                    -> afterburn level cool|normal|hot
+# Calls happen only on change. Needs bash, awk, jq, curl, socat; upower optional.
+set -u
+export PATH="$HOME/.local/bin:$PATH"   # systemd's PATH may lack ~/.local/bin
+
+CONF=${XDG_CONFIG_HOME:-$HOME/.config}/afterburn/afterburn.conf
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/afterburn
+THEME_FILE=$HOME/.local/state/omarchy/current/theme.name
+WEATHER=$STATE/weather.json
+PSI_FILE=${PSI_FILE:-/proc/pressure/cpu}          # overridable for tests
+POWER_DIR=${POWER_DIR:-/sys/class/power_supply}   # overridable for tests
+# ab_has_battery and ab_on_ac: only a system battery counts, not a wireless mouse's. The helper sits next to bin/.
+# shellcheck disable=SC1091
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../afterburn-power.sh"
+UA='afterburn-theme (github.com/silverwulf212/omarchy-afterburn-theme)'
+LEVELS=(cool normal hot)
+
+# Defaults first, so a missing or partial conf still leaves every value set.
+load_conf() {
+  HEAT_SOURCE=time EVENING_HOURS=19-07 HOT_F=90 COOL_F=50
+  FULLSCREEN_QUIET=yes LAPTOP_MODE=auto LAT= LON=
+  [[ -f $CONF ]] && . "$CONF"
+}
+
+# True for the base theme and for the colour editions (afterburn-voltage, -cyber, ...).
+# A builtin read, no fork: every power and heat tick asks.
+is_afterburn() { local t=; { IFS= read -r t < "$THEME_FILE"; } 2>/dev/null; [[ $t == afterburn || $t == afterburn-* ]]; }
+
+# --- fullscreen: quiet while a window is fullscreen --------------------------
+# Quiet follows the screen: any fullscreen window on a workspace a monitor shows now, not the last event (with two
+# monitors, leaving fullscreen on one must not end quiet while the other is still fullscreen). One read of each, one
+# jq. A failed read counts as nothing fullscreen.
+screen_fullscreen() {
+  local mons
+  mons=$(hyprctl -j monitors 2>/dev/null)
+  hyprctl -j clients 2>/dev/null | jq -e --argjson m "${mons:-[]}" \
+    '[$m[].activeWorkspace.id] as $v | any(.[]; .fullscreen > 0 and (.workspace.id | IN($v[])))' >/dev/null 2>&1
+}
+
+# At start, quiet follows what is on screen now. A fullscreen toggle missed while the
+# watcher was stopped would otherwise leave quiet stuck on (or off) until the next toggle.
+sync_quiet() {
+  is_afterburn || return 0
+  hypr_pick
+  load_conf
+  if [[ $FULLSCREEN_QUIET == yes ]] && screen_fullscreen; then
+    afterburn quiet on
+  else
+    afterburn quiet off
+  fi
+}
+
+# Hyprland rebuilt its config (afterburn's own reload, an Omarchy toggle, a monitor change, an autoreload). The
+# rebuild comes from the generated Lua, which holds the normal level only, so put the saved level back. `afterburn
+# level` pushes it with one `hyprctl eval` and never reloads, so its own pass cannot start another one. Normal needs
+# nothing (the file says normal); quiet and saver hold the glow still, and their own end re-applies it.
+# Builtin reads only: no fork unless there is something to put back.
+reload_event() {
+  is_afterburn || return 0
+  local lvl=normal q= s=
+  { IFS= read -r lvl < "$STATE/level"; } 2>/dev/null
+  { IFS= read -r q < "$STATE/quiet"; } 2>/dev/null
+  { IFS= read -r s < "$STATE/saver"; } 2>/dev/null
+  [[ $lvl == cool || $lvl == hot ]] && [[ $q != on && $s != on ]] || return 0
+  hypr_pick
+  afterburn level "$lvl"
+}
+
+# One socket2 line. The case runs first, so the many unrelated events (focus, title, workspace)
+# cost nothing: no source, no fork.
+fullscreen_event() {
+  case $1 in
+    'fullscreen>>1'|'fullscreen>>0') ;;
+    'configreloaded>>'*) reload_event; return 0 ;;
+    *) return 0 ;;
+  esac
+  load_conf
+  is_afterburn || return 0
+  if [[ $1 == 'fullscreen>>1' ]]; then
+    [[ $FULLSCREEN_QUIET == yes ]] && afterburn quiet on
+  else
+    # Leaving clears quiet unless a window on another visible workspace is still fullscreen (and FULLSCREEN_QUIET
+    # is yes: if it was switched to no while quiet was on, leaving always clears). A builtin read of the state file
+    # first, so a quiet that is already off costs no fork.
+    local q=; { IFS= read -r q < "$STATE/quiet"; } 2>/dev/null
+    [[ $q == on ]] || return 0
+    hypr_pick
+    [[ $FULLSCREEN_QUIET == yes ]] && screen_fullscreen || afterburn quiet off
+  fi
+  return 0
+}
+
+# A live Hyprland instance has a hyprland.lock holding its pid. A dead one can leave .socket2.sock behind (and a
+# crashed one its lock), so a socket file alone proves nothing. Builtins only.
+hypr_alive() {
+  local p=; { IFS= read -r p < "$1/hyprland.lock"; } 2>/dev/null
+  [[ $p =~ ^[0-9]+$ ]] && kill -0 "$p" 2>/dev/null
+}
+
+# Choose the live instance: keep ours while it lives, else the newest live one, else the newest folder (returns 1;
+# the socket will not connect and the caller retries). Exported, so every `afterburn` and `hyprctl` this process
+# runs talks to the compositor that is up now. Each loop is its own process and calls this before it acts.
+hypr_pick() {
+  local dir=${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr s newest=
+  hypr_alive "$dir/${HYPRLAND_INSTANCE_SIGNATURE:-}" && return 0   # the usual case: no fork
+  for s in $(ls -t "$dir" 2>/dev/null); do
+    [[ -n $newest ]] || newest=$s
+    hypr_alive "$dir/$s" && { export HYPRLAND_INSTANCE_SIGNATURE=$s; return 0; }
+  done
+  [[ -z $newest ]] || export HYPRLAND_INSTANCE_SIGNATURE=$newest
+  return 1
+}
+
+hypr_socket() { echo "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket2.sock"; }
+
+watch_fullscreen() {
+  local line first=1
+  while :; do
+    # After a reconnect, read the fullscreen state again (a toggle during the gap sent no event we saw) and put the
+    # heat level back (a restarted Hyprland loads the normal-level file). The first pass follows main's sync_quiet.
+    # Only while an instance is up, so a long outage costs nothing.
+    if hypr_pick && (( ! first )); then sync_quiet; reload_event; fi
+    first=0
+    socat -U - "UNIX-CONNECT:$(hypr_socket)" 2>/dev/null | while IFS= read -r line; do
+      fullscreen_event "$line"
+    done
+    sleep 5   # socket gone or Hyprland restarted: try again
+  done
+}
+
+# --- power: battery means saver mode -----------------------------------------
+# Only a system battery makes this a laptop (see afterburn-power.sh). A wireless mouse reporting
+# "discharging" on a desktop must not turn the saver on.
+# $battery (yes|no) is asked once per watcher run: a machine does not gain or lose its own battery while up.
+power_tick() {  # reads and sets $saver, the last value we applied, and $battery (both set by watch_power)
+  load_conf
+  is_afterburn || return 0
+  # Not auto: the saver is set by hand. Forget what we applied, so the next auto tick puts it back in line.
+  [[ $LAPTOP_MODE == auto ]] || { saver=""; return 0; }
+  [[ -n ${battery:-} ]] || { ab_has_battery && battery=yes || battery=no; }
+  if [[ $battery == no ]]; then
+    # Not a laptop. Older versions counted a mouse battery and may have left the saver on: switch it off
+    # once per watcher start. After that the saver is yours (afterburn saver on|off). The one-time check is
+    # used up on the first desktop tick whether or not there was anything to clear; a failed clear may retry.
+    if [[ -z ${saver:-} ]]; then
+      if [[ $(cat "$STATE/saver" 2>/dev/null) == on ]]; then
+        hypr_pick; afterburn saver off && saver=off
+      else
+        saver=off
+      fi
+    fi
+    return 0
+  fi
+  local want=on
+  ab_on_ac && want=off
+  if [[ $want != "${saver:-}" ]]; then hypr_pick; afterburn saver "$want" && saver=$want; fi
+}
+
+watch_power() {
+  local saver="" battery=""
+  while :; do
+    power_tick
+    if command -v upower >/dev/null; then
+      # process substitution keeps the loop in this shell, so $saver persists
+      while read -r _; do power_tick; done < <(upower --monitor 2>/dev/null)
+    fi
+    sleep 30   # upower exited, or there is no upower: poll
+  done
+}
+
+# --- heat: the level, from time, CPU pressure or weather ---------------------
+time_level() {  # cool inside EVENING_HOURS (e.g. 19-07 wraps midnight)
+  # `date`, not printf %(%H)T: a long-running bash keeps the timezone it started with, date follows a change.
+  local s e h=$((10#$(date +%H))) inside=0
+  IFS=- read -r s e <<<"$EVENING_HOURS"
+  s=$((10#$s)); e=$((10#$e))
+  if (( s <= e )); then (( h >= s && h < e )) && inside=1
+  else (( h >= s || h < e )) && inside=1; fi
+  (( inside )) && echo cool || echo normal
+}
+
+pressure_level() {  # CPU pressure avg10 (PSI): <5 cool, 5-35 normal, >35 hot
+  local avg
+  avg=$(awk '/^some/ { sub("avg10=", "", $2); print $2 }' "$PSI_FILE" 2>/dev/null)
+  [[ -n $avg ]] || return 1
+  awk -v a="$avg" 'BEGIN { print (a < 5) ? "cool" : (a > 35) ? "hot" : "normal" }'
+}
+
+fetch_weather() {  # NWS: points -> first station -> latest obs; forecastHourly for day/night
+  local now pts sid obs hr
+  now=$(date +%s); mkdir -p "$STATE"
+  get() { curl -fsS -m 15 -H "User-Agent: $UA" -H 'Accept: application/geo+json' "$1"; }
+  pts=$(get "https://api.weather.gov/points/$LAT,$LON") &&
+  sid=$(get "$(jq -r '.properties.observationStations' <<<"$pts")" |
+        jq -r '(.observationStations[0] // .features[0].properties.stationIdentifier // empty) | split("/") | last') &&
+  obs=$(get "https://api.weather.gov/stations/$sid/observations/latest") &&
+  hr=$(get "$(jq -r '.properties.forecastHourly' <<<"$pts")") &&
+  jq -n --argjson now "$now" --argjson obs "$obs" --argjson hr "$hr" '{
+    checked: $now,
+    tempF: ($obs.properties.temperature.value | if . == null then null else . * 9 / 5 + 32 end),
+    text: ($obs.properties.textDescription // ""),
+    night: ($hr.properties.periods[0].isDaytime == false)
+  }' > "$WEATHER.tmp" && mv "$WEATHER.tmp" "$WEATHER" && return 0
+  # failed: store only the attempt time, so we retry in 20 min and keep the last level
+  jq -n --argjson now "$now" '{checked: $now}' > "$WEATHER"
+  return 1
+}
+
+# The cached fields in one jq: sets checked, f (tempF), night and txt (lowercased). The text comes last, so nothing
+# in it can shift the others. A text that is not a string counts as none, so the level is still worked out.
+weather_fields() {
+  IFS=$'\x1f' read -r -d '' checked f night txt < <(jq -j \
+    '[.checked // 0, .tempF // "", .night, (.text // "" | if type == "string" then ascii_downcase else "" end)] | map(tostring) | join("\u001f")' "$WEATHER" 2>/dev/null)
+}
+
+weather_level() {  # cached NWS data -> level; no data means no change
+  local now checked f txt night i
+  now=$(date +%s)
+  weather_fields
+  (( now - ${checked:-0} >= 1200 )) && { fetch_weather; weather_fields; }   # a failed fetch rewrites the cache too
+  [[ -n $f ]] || return 1
+  i=$(awk -v t="$f" -v h="$HOT_F" -v c="$COOL_F" 'BEGIN { print (t >= h) ? 2 : (t <= c) ? 0 : 1 }')
+  [[ $txt =~ rain|drizzle|shower|snow|thunder ]] && i=0
+  [[ $night == true && $i -gt 0 ]] && i=$((i - 1))
+  echo "${LEVELS[i]}"
+}
+
+heat_level() {  # prints cool|normal|hot, or nothing when off or no data
+  case $HEAT_SOURCE in
+    time) time_level ;;
+    pressure) pressure_level ;;
+    weather) weather_level ;;
+  esac
+}
+
+watch_heat() {
+  local applied="" prev="" cand
+  while :; do
+    load_conf
+    if is_afterburn; then
+      cand=$(heat_level)
+      # pressure is jumpy: switch only after two equal readings in a row
+      if [[ -n $cand && $cand != "$applied" ]] && { [[ $HEAT_SOURCE != pressure || $cand == "$prev" ]]; }; then
+        hypr_pick; afterburn level "$cand" && applied=$cand
+      fi
+      prev=$cand
+    fi
+    # CPU load is checked every 10 s, so the glow answers a busy machine in about 20 s; time and weather move slowly.
+    if [[ $HEAT_SOURCE == pressure ]]; then sleep 10; else sleep 60; fi
+  done
+}
+
+main() {
+  trap 'trap - EXIT TERM INT; kill 0' EXIT TERM INT   # stop all three loops together
+  sync_quiet
+  watch_fullscreen &
+  watch_power &
+  watch_heat &
+  wait
+}
+
+[[ ${BASH_SOURCE[0]} == "$0" ]] && main "$@"

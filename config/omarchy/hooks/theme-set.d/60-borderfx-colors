@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Border FX colours follow the Afterburn theme (and its colour editions).
+# Omarchy runs this on every theme change with the theme name as $1.
+#
+# On afterburn or afterburn-<name>: sets only the colour keys of the wmfeht.border-fx entry in
+#   shell.json (gradient, gradientPositions, baseColor), taken from that theme's colors.toml.
+# On any other theme: removes those three keys, so Border FX goes back to its own preset.
+#
+# Shimmer, lobe, speed, mirror and every other key are never touched.
+set -u
+THEME="${1:-}"
+CUR="$HOME/.local/state/omarchy/current/theme"
+COLORS="$CUR/colors.toml"
+SHELL_JSON="$HOME/.config/omarchy/shell.json"
+PLUGIN="$HOME/.config/omarchy/plugins/wmfeht.border-fx"
+[[ -f $SHELL_JSON ]] || exit 0
+
+changed=$(python3 - "$THEME" "$COLORS" "$SHELL_JSON" <<'PY'
+import json, os, re, sys
+
+theme, colors_path, shell_path = sys.argv[1:4]
+COLOUR_KEYS = ("gradient", "gradientPositions", "baseColor")
+is_afterburn = re.fullmatch(r"afterburn(-.+)?", theme) is not None
+
+def read_palette():
+    try:
+        text = open(colors_path, encoding="utf-8").read()
+    except OSError:
+        return None
+    border = re.search(r'^hyprland_active_border\s*=\s*"([^"]+)"', text, re.M)
+    accent = re.search(r'^accent\s*=\s*"#([0-9a-fA-F]{6})"', text, re.M)
+    if not border or not accent:
+        return None
+    stops = re.findall(r'rgba\(([0-9a-fA-F]{8})\)', border.group(1))[:3]
+    if len(stops) < 2:
+        return None
+    # Dark wrap under the highlight, scaled so its brightest channel matches the stock teal wrap
+    # (#0a3f47, brightest channel 0x47), so it is as dark as the original.
+    rgb = [int(accent.group(1)[i:i + 2], 16) for i in (0, 2, 4)]
+    scale = 0x47 / max(rgb)
+    dark = "".join(f"{round(c * scale):02x}" for c in rgb)
+    return {
+        # Same shape as the stock preset: a light stop fading to a transparent one over the whole
+        # ring, so the highlight runs out instead of leaving a solid band.
+        "gradient": [f"rgba({stops[-1]})", f"rgba({stops[1][:6]}00)"],
+        "gradientPositions": "0 99",
+        "baseColor": f"rgba({dark}dd)",
+    }
+
+with open(shell_path, encoding="utf-8") as f:
+    shell = json.load(f)
+
+entries = [p for p in shell.get("plugins", []) if p.get("id") == "wmfeht.border-fx"]
+if not entries:
+    print("no")
+    sys.exit(0)
+entry = entries[0]
+before = json.dumps(entry, sort_keys=True)
+
+if is_afterburn:
+    palette = read_palette()
+    if palette is None:
+        print("no")
+        sys.exit(0)
+    entry.update(palette)
+else:
+    for key in COLOUR_KEYS:
+        entry.pop(key, None)
+
+if json.dumps(entry, sort_keys=True) == before:
+    print("no")
+    sys.exit(0)
+
+tmp = shell_path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(shell, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+os.replace(tmp, shell_path)
+print("yes")
+PY
+)
+
+if [[ $changed == yes && -d $PLUGIN ]]; then
+  "$PLUGIN/scripts/border-fx" apply --eval --root "$PLUGIN" >/dev/null 2>&1 || true
+fi
+exit 0

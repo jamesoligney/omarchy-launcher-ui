@@ -1,0 +1,47 @@
+# Machine-level shell overrides (survives theme switches).
+# Bar thickness 32 logical px: matches the top notch cutout reservation on
+# eDP-1 so top and bottom reserved space are identical (see hypr/monitors.lua).
+[bar]
+size-horizontal = 32
+
+# Launcher design tokens (phase 1 of the shell-wide refresh).
+# Colour values are role names resolved against the active theme's
+# colors.toml, so a theme switch re-tints the launcher without editing this
+# file. Sizes are logical px; phase 2 (menu bar) can read the same tokens.
+[launcher]
+panel-background         = "background"
+panel-background-alpha   = 0.70
+panel-border             = "accent"
+panel-border-alpha       = 0.16
+text                     = "foreground"
+muted                    = "foreground"
+muted-alpha              = 0.55
+selected-background      = "accent"
+selected-background-alpha = 0.16
+selected-border          = "accent"
+selected-border-alpha    = 0.55
+selected-text            = "foreground"
+scrim                    = "background"
+scrim-alpha              = 0.35
+hint-alpha               = 0.66
+
+width                    = 607
+max-height               = 459
+top-fraction             = 0.16
+panel-radius             = 16
+row-radius               = 10
+panel-padding            = 12
+search-padding-x         = 16
+search-padding-y         = 14
+search-size              = 22
+search-weight            = 500
+content-gap              = 6
+row-height               = 50
+row-gap                  = 2
+row-padding-x            = 12
+icon-size                = 22
+name-size                = 15
+name-weight              = 500
+subtitle-size            = 11
+hint-size                = 13
+hint-font                = "JetBrainsMono Nerd Font"

@@ -30,6 +30,9 @@ Efficient, clean, and light code is the standard, every iteration. No bloated, h
 - Both pickers share the launcher's design tokens (glass, radius 16), not the stock `[menu]` tokens (opaque, radius 8, no blur).
 - Animation: James wants the subtle zoom + bounce from v2 (scale ~0.96 → 1.0, small spring overshoot, ~200ms). Omarchy's own motion guidelines say the launcher should have no open motion and never bounce — that is a house-style guideline, not a technical limit. The launcher is our plugin clone, in QML, and it can animate scale/opacity internally. James has overruled the guideline: bounce is wanted, subtle, not cartoonish. Implement it in the clone and verify it live; do not let the guideline silently drop it again.
 
+## Backups — standing rule
+Backups must be complete: **audit first, never commit a fraction.** Before snapshotting anything, list every file that determines the behaviour in question (plugins, binds, shell.json, shell.toml, hooks, themes, hypr includes, anything the loader pulls in), then include all of it. Anything left out must be named exactly in the report with the reason. Never put runtime state (clipboard history, pins, recents, pause flag, notifications) in git: it can hold copied secrets. Back it up locally in a timestamped, mode-700 folder under `~/.local/state/omarchy-launcher-backups/`. Verify the live files are unchanged (checksums before and after) and that the snapshot equals live.
+
 ## Current state (2026-11-23)
 - v1 launcher live, v2 live with spaced keybind symbols (`⌘ ⇧ B`, `⌥ H`) and a 15–20% smaller panel. Animation did not land (see above).
 - Iteration 3a audit done (read-only, DeepSeek plan mode). Report: `docs/omarchy-launcher-iteration-3a-audit-report.md`. It confirms the six Vicinae binds, their storage (`~/.config/vicinae/settings.json` → `providers.applications.entrypoints`), and the emoji/clipboard gaps.
@@ -44,6 +47,7 @@ Efficient, clean, and light code is the standard, every iteration. No bloated, h
 - `docs/omarchy-launcher-iteration-3a-audit-report.md` — audit results.
 - `docs/omarchy-launcher-iteration-3b-build-brief.md` — build handoff (run later).
 - `docs/omarchy-launcher-iteration-2-brief.md` — previous iteration, for history.
+- `plugins/`, `config/` — fallback snapshot of the live plugins and config (live sources stay in `~/.config/`; see their READMEs for restore).
 
 ## Before you start work
 1. Read this file and the spec.

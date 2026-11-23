@@ -1,0 +1,126 @@
+// This configuration is merged with the default vicinae configuration file, which you can obtain by running the `vicinae config default` command.
+// Every item defined in this file takes precedence over the values defined in the default config or any other imported file.
+//
+// You can make manual edits to this file, however you should keep in mind that this file may be written to by vicinae when a configuration change is made through the GUI.
+// When that happens, any custom comments or formatting will be lost.
+//
+// If you want to maintain a configuration file with your own comments and formatting, you should create a separate file and add it to the 'imports' array.
+//
+// Learn more about configuration at https://docs.vicinae.com/config
+
+{
+   "$schema": "https://vicinae.com/schemas/config.json",
+   "wrap_navigation": true,
+   "providers": {
+      "@AdityaZxxx/store.vicinae.helium": {
+         "preferences": {
+            "profile_dir": ".config/net.imput.helium"
+         }
+      },
+      "@isfeng/store.raycast.easydict": {
+         "preferences": {
+            "language1": "en",
+            "language2": "fr",
+            "bingHost": "",
+            "enableAutomaticQuerySelectedText": true,
+            "showOpenInEudicFirst": false,
+            "enableDetectLanguageSpeedFirst": true,
+            "enableAutomaticPlayWordAudio": true,
+            "enableSelectTargetLanguage": false,
+            "queryCacheMode": "off",
+            "aiQueryCacheMode": "off",
+            "enableBaiduLanguageDetect": true,
+            "enableTencentLanguageDetect": false,
+            "enableVolcanoLanguageDetect": false,
+            "enableAppleTranslate": false,
+            "flagsAreNotLanguages": false,
+            "enableAutomaticAddFavoriteToAnki": false,
+            "ankiDeckName": "Easydict",
+            "ankiConnectUrl": "http://127.0.0.1:8765",
+            "enableYoudaoDictionary": true,
+            "enableLingueeDictionary": true,
+            "enableOpenAITranslate": false,
+            "enableGeminiTranslate": false,
+            "enableDeepLTranslate": false,
+            "enableDeepLXTranslate": true,
+            "enableGoogleTranslate": false,
+            "enableBingTranslate": true,
+            "enableBaiduTranslate": false,
+            "enableTencentTranslate": false,
+            "enableVolcanoTranslate": false,
+            "enableYoudaoTranslate": false,
+            "enableCaiyunTranslate": false,
+            "servicesOrder": "",
+            "openAIAPIURL": "https://api.openai.com/v1",
+            "openAIModel": "gpt-5.4-mini",
+            "forceMaxCompletionTokens": false,
+            "geminiAPIURL": "https://generativelanguage.googleapis.com",
+            "geminiModel": "gemini-3.5-flash",
+            "deepLEndpoint": "",
+            "tencentSecretId": "",
+            "volcanoAccessKeyId": ""
+         }
+      },
+      "ai": {
+         "enabled": false
+      },
+      "applications": {
+         "entrypoints": {}
+      },
+      "clipboard": {
+         "entrypoints": {
+            "clear": {
+               "enabled": false
+            },
+            "clear-history": {
+               "enabled": false
+            }
+         },
+         "tools": {
+            "read_entry": {
+               "policy": "allow"
+            },
+            "search_history": {
+               "policy": "allow"
+            }
+         }
+      },
+      "core": {
+         "entrypoints": {
+            "search-emojis": {
+               "shortcut": "alt+shift+E"
+            }
+         }
+      },
+      "dictation": {
+         "enabled": false
+      },
+      "files": {
+         "preferences": {
+            "autoIndexing": false,
+            "indexingPaths": [
+               "/home/jimmy"
+            ],
+            "excludedIndexingPaths": [
+               "/home/jimmy/GoogleDrive_home",
+               "/home/jimmy/GoogleDrive_work"
+            ]
+         }
+      },
+      "media": {
+         "enabled": false
+      },
+      "snippets": {
+         "preferences": {
+            "enabled": true,
+            "undo": true,
+            "layout": "",
+            "prePasteDelay": "0",
+            "keyDelay": "2"
+         }
+      },
+      "wm": {
+         "enabled": true
+      }
+   }
+}

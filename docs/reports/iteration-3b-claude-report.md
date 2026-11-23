@@ -359,3 +359,94 @@ hyprctl reload
 `cp -a` overwrites same-named files and leaves other live files in place. Back up the live `bindings.lua` first if it has binds you want to keep. `omarchy restart shell` only, never `omarchy refresh shell`.
 
 The snapshot reflects the state at the commit that adds it: the Option-key chips, Option+P pin, Option+S pause, the shared card motion, and the emoji Recently used strip changes.
+
+
+---
+
+# Complete fallback snapshot (2026-11-23)
+
+This **replaces the earlier "Fallback snapshot of the live launcher code" section**, which covered only four plugin folders and `bindings.lua` and missed `shell.toml`, `shell.json`, the other Hyprland files, the hooks and more. It was a fraction. This round started with an audit of everything that determines how the launcher, emoji picker, clipboard picker, bar, animation and binds behave, and the snapshot follows that audit.
+
+## What the audit found
+
+- **Launcher and pickers:** the four `jimmy.*` plugin folders; the glass blur rule for the three picker layers in `hypr/menu-glass.lua`; the design tokens in `shell.toml` (`[launcher]`); the launcher's menu rows in `extensions/omarchy-menu.jsonc`; the bar entry and the `disabledPlugins` / `cloneSourceRestores` lists in `shell.json` (these are what make the clones replace the stock menu, emoji and clipboard plugins).
+- **Bar:** `shell.json` (layout, plugin settings), `shell.toml` (`[bar]`), the user's own bar plugins `jimmy.workspaces`, `jimmy.active-window`, `jimmy.idle`.
+- **Animation:** `jimmy.shared/CardMotion.qml` (picker motion), `hypr/tricky-tiles.lua` and `tricky-tiles.json` (window-switch spring), `hypr/omarchy_fx.lua`, `hypr/border-fx.lua`, `hypr/no-shadow.lua`, `hypr/looknfeel.lua`, `omarchy-fx.conf`.
+- **Binds:** `hypr/bindings.lua` (single source of truth), `hypr/hyprland.lua` (the loader that decides which files run and in what order), `hypr/autostart.lua`, `hypr/input.lua`, `hypr/monitors.lua`; `vicinae/settings.json`, which I edited in Part A.
+- **Theme tinting:** the theme files that give the launcher its colours (`colors.toml`, `hyprland.lua`, editions) and the `theme-set.d` hooks that rewrite `shell.json` colour keys on a theme change.
+
+## Committed (159 files under `plugins/` and `config/`, including the two READMEs and the plugin inventory)
+
+
+- `config/`: `README.md`
+- `config/hypr/`: `.luarc.json`, `autostart.lua`, `bindings.lua`, `border-fx.lua`, `hyprland.lua`, `hyprsunset.conf`, `input.lua`, `looknfeel.lua`, `menu-glass.lua`, `monitors.lua`, `no-shadow.lua`, `omarchy_fx.lua`, `tricky-tiles.lua`, `xdph.conf`
+- `config/omarchy/extensions/`: `omarchy-menu.jsonc`
+- `config/omarchy/hooks/battery-low.d/`: `play-warning-sound.sample`
+- `config/omarchy/hooks/font-set.d/`: `show-font-notification.sample`
+- `config/omarchy/hooks/post-boot.d/`: `weather.sample`
+- `config/omarchy/hooks/post-update.d/`: `show-update-notification.sample`
+- `config/omarchy/hooks/pre-refresh-pacman.d/`: `add-custom-repo.sample`
+- `config/omarchy/hooks/theme-set.d/`: `10-owe-sync`, `50-afterburn-extras`, `60-borderfx-colors`, `show-theme-notification.sample`
+- `config/omarchy/`: `omarchy-fx.conf`, `shell.json`, `shell.toml`, `third-party-plugins.tsv`, `tricky-tiles.json`
+- `config/omarchy/tweaks/`: `README.md`, `active-window-app-name.md`, `border-fx-rust-toolchain.md`, `close-window-or-tab.md`, `cmatrix-screensaver.md`, `fathom-alt-tab.md`, `ghostty-font-size.md`, `glyph-menu-launcher.md`, `klack-pack-switcher.md`, `klack-soundpack-keycodes.md`, `lock-explorer-weather-units-issue.md`, `lock-screen-explorer.md`, `parked-ideas.md`, `plugins-to-revisit.md`, `scratchpad-hotkey.md`, `workspaces-focused-first.md`, `yt-idle-inhibit.md`, `yt-mini-video.md`
+- `config/vicinae/`: `settings.json`
+- `plugins/`: `README.md`
+- `plugins/jimmy.active-window/`: `ActiveWindow.qml`, `manifest.json`
+- `plugins/jimmy.clipboard/`: `Clipboard.qml`, `ClipboardHistory.js`, `capture.sh`, `manifest.json`
+- `plugins/jimmy.emojis/`: `EmojiSearch.js`, `Emojis.qml`, `emoji-data.json`, `manifest.json`
+- `plugins/jimmy.idle/`: `IdleModel.js`, `Service.qml`, `manifest.json`
+- `plugins/jimmy.menu/`: `BarWidget.qml`, `Launcher.js`, `Menu.qml`, `MenuModel.js`, `README.md`, `manifest.json`
+- `plugins/jimmy.shared/`: `CardMotion.qml`
+- `plugins/jimmy.workspaces/`: `Workspaces.qml`, `manifest.json`
+- `config/omarchy/themes/`: small text files only (`colors.toml`, `hyprland.lua`, `edition.conf`, `icons.theme`, `btop.theme`, `neovim.lua`, `CHANGELOG.md`, the `.editions/` and `extras/` text files) for `afterburn-cyber` (6 files), `afterburn-lite` (4 files), `afterburn-overdrive` (5 files), `afterburn-phantom` (4 files), `afterburn-redline` (5 files), `afterburn-voltage` (5 files), `afterburn` (58 files)
+
+`config/omarchy/third-party-plugins.tsv` lists the 16 third-party plugins (id, version, size) so they can be reinstalled.
+
+## Excluded, and why
+
+**Runtime state, never in git (backed up locally instead):**
+- Everything in `~/.local/state/omarchy/`: `clipboard-history.json` (about 730 KB), `clipboard-images/`, `clipboard-pins.json`, `clipboard-paused`, `emoji-pins.json`, `emoji-recents.json`, `notifications/`, `current/` (active theme copy), `toggles/`, `windows/`, `workspace-layouts/`, the logs and lock files. Clipboard history and notifications can contain copied secrets.
+- `~/.config/omarchy/defaults/` (`agent`, `dictation` which is mode 600, `dictation.lock`) and `lock-explorer.json` (generated by a plugin): private or generated, not launcher behaviour.
+- **Local backup:** `/home/jimmy/.local/state/omarchy-launcher-backups/state-20261123-150633` (mode 700, 134 MB). It holds `omarchy-state/` (a full copy of the state dir) and `excluded-config/` (the two items just above), plus a `RESTORE.txt`. It is on this machine only.
+
+**Not behaviour, or reproducible:**
+- **Third-party plugin code** (16 folders, about 150 MB): upstream code, reinstallable, listed in the `.tsv`. Their settings are in `shell.json` (committed). I did not inspect the third-party folders for plugin-local data files, so anything a plugin keeps inside its own folder is not covered.
+- **Wallpapers and images:** `~/.config/omarchy/backgrounds/` (23 MB), every theme's `backgrounds/`, `preview*.png`, `unlock.png`. They set the look behind the glass but not behaviour; large binaries.
+- **Rest of the theme repos:** `.git/`, `tests/`, `tools/`, `docs/`, README/LICENSE/WALLPAPERS of the Afterburn themes (each theme is its own upstream git clone, 394 MB in total), and files over 200 KB.
+- **Lock screen and screensaver:** `lock-designs/`, `lock-videos/`, `lock-components/`, `matrix-screens/`, `branding/`, `themed/`. They do not touch the launcher, pickers, bar, animation or binds.
+- **Backups of the backups:** every `*.bak*` file (17 `shell.json.bak*`, 7 `bindings.lua.bak*`, 7 `hyprland.lua.bak*`, `omarchy-menu.jsonc.bak*`, `tweaks/README.md.bak*`, `Menu.qml.bak.3b-anim`, Vicinae's `settings.json.bak*`). Superseded copies, some mode 600; the live files are the source.
+- **Stock Omarchy** (`/usr/share/omarchy`): not ours, and updates replace it. Per AGENTS.md we never edit it.
+- **Not looked at:** the font setting (`omarchy-font-current`) and anything Omarchy or Hyprland keeps outside `~/.config/hypr`, `~/.config/omarchy` and `~/.config/vicinae`. I did not trace where the font is stored. Vicinae's own clipboard database and data folder were not touched or copied.
+
+A secret scan (API key, token, password, private key, bearer patterns) over every committed file found nothing real. The only matches were the word "password" in comments and app names, and Vicinae's empty credential fields.
+
+## Verified
+
+- SHA-256 of all 156 live source files was taken before the copy and again after: identical. Nothing live was edited or moved.
+- Every committed file was compared with its live source byte for byte: all identical.
+- The staged files were checked for state-like names and secret patterns: none. The only name matches were three stock `*-notification.sample` hook files.
+- `omarchy restart shell` was not needed; nothing live changed.
+
+## Restore
+
+From the repo (details in `plugins/README.md` and `config/README.md`):
+
+```bash
+cp -a plugins/jimmy.* ~/.config/omarchy/plugins/            # the seven user plugins; restore together
+cp -a config/hypr/. ~/.config/hypr/ && hyprctl reload
+cp -p config/omarchy/shell.json config/omarchy/shell.toml config/omarchy/tricky-tiles.json config/omarchy/omarchy-fx.conf ~/.config/omarchy/
+cp -p config/omarchy/extensions/omarchy-menu.jsonc ~/.config/omarchy/extensions/
+cp -a config/omarchy/hooks/. ~/.config/omarchy/hooks/
+cp -a config/omarchy/tweaks/. ~/.config/omarchy/tweaks/
+cp -a config/omarchy/themes/. ~/.config/omarchy/themes/
+cp -p config/vicinae/settings.json ~/.config/vicinae/settings.json
+omarchy restart shell
+```
+
+Back up the live `shell.json` and `bindings.lua` first if they hold anything you want to keep. `cp -a src/. dest/` merges and never deletes. **Never `omarchy refresh shell`**: it resets `shell.json` to defaults. Reinstall third-party plugins from the `.tsv`.
+
+From the local state backup (machine only): see `/home/jimmy/.local/state/omarchy-launcher-backups/state-20261123-150633/RESTORE.txt`. The short version is `cp -a /home/jimmy/.local/state/omarchy-launcher-backups/state-20261123-150633/omarchy-state/clipboard-history.json ... ~/.local/state/omarchy/` for just the picker data, or `cp -a /home/jimmy/.local/state/omarchy-launcher-backups/state-20261123-150633/omarchy-state/. ~/.local/state/omarchy/` for everything.
+
+## Standing rule added
+
+`AGENTS.md` now has a "Backups — standing rule" section: backups must be complete, audit first, never commit a fraction; name anything left out and why; never put runtime state in git, back it up locally in a timestamped mode-700 folder; verify live files unchanged and snapshot equals live.
