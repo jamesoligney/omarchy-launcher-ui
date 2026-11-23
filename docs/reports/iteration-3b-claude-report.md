@@ -142,3 +142,39 @@ None of the motion values are duplicated. The remaining per-plugin code is the `
 ## Coupling note
 
 The three plugins now depend on `jimmy.shared` being present. It has no manifest and no entry point, so it is not a plugin itself. The shell logs "Local plugin changed, reloading: jimmy.shared" when it is edited, which is harmless. These files live under `~/.config/omarchy/plugins/` and are not tracked in this repo.
+
+---
+
+# Keyboard-switchable chips: clipboard and emoji pickers (2026-11-23)
+
+## What changed
+
+Both pickers handle the chip keys in the search field's existing `Keys.onPressed` (priority `BeforeItem`), so focus never leaves the search field and typing keeps working. The filter changes on the keypress itself (`setTypeFilter` / `setCategory`, which rebuild the list at once).
+
+**Clipboard** (`jimmy.clipboard/Clipboard.qml`)
+- `Ctrl+1` All, `Ctrl+2` Text, `Ctrl+3` Images, `Ctrl+4` Files.
+- `Tab` / `Right` next chip, `Shift+Tab` / `Left` previous, wrapping. The search line has no text cursor of its own, so plain Left and Right were free.
+- The chip list moved from `filterRow.filters` to `root.typeFilters`, so the keys and the chips read one list.
+
+**Emoji** (`jimmy.emojis/Emojis.qml`)
+- There was no "All" chip (the picker opened on all with nothing highlighted). I added one as the first chip so the open state is visible and reachable by key.
+- `Ctrl+1` All, `Ctrl+2` to `Ctrl+9` Smileys, People, Animals, Food, Travel, Activities, Objects, Symbols, and `Ctrl+0` Flags (the tenth chip).
+- `Tab` next, `Shift+Tab` previous, wrapping. Left and Right stay with the emoji grid; I did not add chip arrows here because they would take over grid navigation.
+- Categories only apply while browsing (the chips are hidden during a search), so a chip key also clears the search text and shows that category. That is a choice; say if you would rather the keys do nothing while searching.
+
+**Hints on the chips:** each chip shows its shortcut after the label as `⌃N`, in the launcher's `hint-alpha` colour, one point smaller. Both pickers got a `hintText` colour matching the launcher's token. Emoji chip padding was tightened (10 instead of 24) because ten chips with hints first overflowed the card ("Flags ⌃0" was clipped); a screenshot after the fix shows all ten fitting.
+
+## Verified live (`omarchy restart shell` only)
+
+Synthetic keys via `wtype`, a temporary log on the filter property, and `grim` screenshots:
+
+- Clipboard: `Ctrl+3` image, `Ctrl+2` text, `Tab` image, `Left` text, `Ctrl+1` all. Screenshot after `Ctrl+3`: Images chip highlighted, list shows only screenshots.
+- Emoji: `Ctrl+3` people, `Ctrl+0` flags, `Tab` all (wrap), `Tab` smileys, `Ctrl+1` all. Typing a letter afterwards still reached the search field.
+- Backward step: `ISO_Left_Tab` (what a real Shift+Tab produces) gave smileys, people, smileys, all.
+- Debug logging removed (0 matches in both files). Both pickers still open after the final restart.
+
+## Not verified
+
+- **Shift+Tab as `wtype -M shift -k Tab`** stepped forward, so the handler also treats Tab with the Shift modifier as backward, but I could not confirm that path. Please press a real Shift+Tab once.
+- **Typing after a chip key in the clipboard picker** was not tested; the emoji picker was.
+- **How the hints look.** I looked at the screenshots but cannot judge the design for you.
