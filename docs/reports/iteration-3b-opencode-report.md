@@ -9,7 +9,7 @@ Scope: **Part B** (emoji picker, clipboard picker, bar widgets) and **Part C** (
 ## Summary
 
 - The emoji and clipboard pickers were cloned to user plugins (`jimmy.emojis`, `jimmy.clipboard`), rebuilt to Vicinae parity, and given the launcher's design tokens. They are reachable by `Super+Ctrl+E` / `Super+Ctrl+V` (no bar icons).
-- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **reworked into a physics `SpringAnimation` spring** — currently an exaggerated scale-only "boink" (peak ~1.17, undershoot ~0.88) to be reined in step by step per James's live checks.
+- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **matched to the window-switch spring** (Tricky Tiles `ttSpring`: ζ = 0.75, ωn = 17.45 rad/s, applied as Qt `spring 4.87 / damping 0.42`), scale-only.
 - Glass opacity was lowered from `0.84` to `0.70` so the wallpaper shows through the launcher and both pickers more clearly.
 - `emojis.json` (dead, superseded by `emoji-data.json`) was removed from the emoji clone after confirming nothing references it.
 
@@ -21,12 +21,16 @@ No stock files under `/usr/share/omarchy` were edited. Reload was `omarchy resta
 
 Follow-up changes, made and verified after James looked at the build live:
 
-1. **Animation — exaggerated "boink" (scale-only this round).** New direction from James: start exaggerated and rein in, not the other way round. The multi-property motion (y-rise, content-lag) was removed; the open is now scale-only — a real QML `SpringAnimation` with `spring: 4.0`, `damping: 0.06`, `mass: 1.0`, `epsilon: 0.02`, starting from `scale 0.75`. Low damping makes it overshoot well past 1.0, undershoot clearly below, and ring ~3 times before settling. Card and scrim still fade in (160 ms) so it doesn't pop. Close stays fast (unchanged).
-   - Note: Qt's `SpringAnimation.damping` is a coefficient, not a ratio — the critical value is `2·√(spring·…)`, so `0.35`/`0.8` were effectively overdamped (no oscillation); `0.06` with `spring 4.0` is deeply underdamped. (Confirmed against the Qt `qquickspringanimation.cpp` source.)
+1. **Animation — window-switch spring applied to scale.** New direction from James: find the window-switch bounce (he says it's right on) and apply those exact numbers. The exaggerated "boink" was reverted.
+   - **Window-switch animation found** (this is what we're duplicating): the Tricky Tiles plugin (`io.github.denonmaryland.tricky-tiles`, preset "lively") defines a Hyprland native spring in `~/.config/hypr/tricky-tiles.lua` and applies it to `windowsMove`/`workspaces`:
+     `hl.curve("ttSpring", { type = "spring", mass = 1, stiffness = 304.617, dampening = 26.18 })` with `speed = 3.6`.
+     → damping ratio **ζ = 0.75** (`26.18 / (2·√304.617)`), natural frequency **ωn = 17.45 rad/s**, preset label "360 ms, bounce 25%".
+   - **Applied to the launcher scale** (Qt `SpringAnimation` has different units, so the same physics is `spring: 4.87`, `damping: 0.42`, `mass: 1.0` — conversion: Qt `ω = 7.906·√spring` → `spring = (17.45/7.906)² = 4.87`; Qt `ζ = 3.953·damping/√spring` → `damping = 0.75·√4.87/3.953 = 0.42`). Start `scale 0.90` (the one value that doesn't translate — the window-switch is a *position* spring with ~40% travel, which a launcher scale range can't reproduce). Card and scrim still fade in (160 ms). Close stays fast (unchanged).
+   - **Non-translatable caveat:** ζ = 0.75 is a *subtle* bounce — it overshoots only ~2.8% of its travel. Windows read it as a visible bounce because they travel ~40% of their size (→ ~1% overshoot); the launcher's scale travel (0.90 → 1.0 = 10%) yields ~0.05% overshoot, which is imperceptible. To make the same ζ bounce read on the launcher, the start scale would need to drop toward ~0.65 (a large zoom) — a judgment call for James, not a change I made.
 2. **Glass — more transparent.** Lowered `panel-background-alpha` from `0.84` to `0.70` in `~/.config/omarchy/shell.toml`. This is the single token the launcher and both pickers read, so all three now let more wallpaper (and blur) through.
 3. **Bar icons — removed.** `jimmy.emojis` and `jimmy.clipboard` were removed from the bar tray, and both plugins were reverted to pure overlays (`kinds: ["overlay"]`, `BarWidget.qml` deleted). They remain reachable by `Super+Ctrl+E` / `Super+Ctrl+V`.
 
-Verification (scale trace on a live open): `0.750 → … → 1.172 (peak) → … → 0.882 (undershoot) → … → 1.080 (2nd peak) → … → 0.945 (2nd undershoot) → … → 1.038 (3rd peak) → … → 1.000 (settle)`, then close `1.000 → … → 0.970`. Three decaying oscillations — unmistakably bouncy.
+Verification (scale trace on a live open): `0.9000 → … → 1.0005 (peak) → … → 0.9914`, then close `… → 0.9700`. The peak **1.0005** is the exact ζ = 0.75 window-switch character on a 0.90 → 1.0 scale travel — subtle, as described above.
 
 ---
 
@@ -92,7 +96,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 - `em dash` → `—`, glyph-character search, category counts, and pin/recency ordering all pass in Node against the real `emoji-data.json`.
 - Clipboard picker opens and renders the list (bright text pixels + accent).
 - **Theme re-tint:** card glass background shifted Afterburn `(14,15,13)` → Catppuccin `(30,30,45)` on `omarchy theme set catppuccin`, then returned on switch back to Afterburn.
-- **Animation spring:** scale trace `0.75 → 1.172 (peak) → 0.882 (undershoot) → 1.080 → 0.945 → 1.038 → 1.0` (journal) — a physics `SpringAnimation` ringing through ~3 oscillations.
+- **Animation spring:** scale trace `0.90 → 1.0005 (peak) → 0.9914 → 1.0` (journal) — the ζ = 0.75 window-switch spring applied to scale.
 - **Glass:** lowering `panel-background-alpha` to `0.70` shifted the emoji card background from `(14,15,13)` to `(15,16,15)` — more wallpaper bleeding through.
 - `emojis.json` removal did not break the picker (grid still renders after removal).
 
@@ -105,7 +109,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 
 ## What still needs James to check by eye
 
-1. **The boink** — this round is deliberately exaggerated (peak ~1.17, undershoot ~0.88, ~3 rings). James will judge by eye and say when to rein it in: raise `damping` (e.g. `0.06 → 0.15`) and/or raise `spring` to shorten the ring, and/or raise the start `scale` toward `0.85` to shrink the swing.
+1. **The bounce** — the window-switch spring (ζ = 0.75) is subtle on a launcher's small scale travel (peak ~1.0005). If James wants it more visible, the lever is a lower start `scale` (more travel) rather than a different spring.
 2. **The pickers' look** — glass/radius-16/blur and layout of the emoji grid + clipboard list/detail.
 3. **Paste, pin, and Pause** in real use.
 
