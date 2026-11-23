@@ -270,3 +270,47 @@ One `omarchy restart shell`, one open of each picker, keys sent with `wtype`, sc
 - **Open (`⌥Enter`), Clear (`⇧Del`) and Remove (`Del`)** were not pressed (they change the user's real history). Only their footer text was checked.
 - **Launcher UI**: audited by reading the code, not by pressing keys in it this round.
 - **Typing after ⌥S or ⌥P** into the search field.
+
+---
+
+# Emoji Recently used strip: visible pinned items, keyboard access (2026-11-23)
+
+## 1. Why the em dash was invisible, and the fix
+
+The glyph `Text` in the strip (and in the main grid) had **no colour set**. QtQuick `Text` defaults to black, so a text-style symbol such as `—` was black on a dark card. Colour emoji were unaffected because they are colour glyphs, which is why only symbols disappeared. The same bug was in the grid, so symbols there were invisible too.
+
+Changes in `jimmy.emojis/Emojis.qml`:
+- Both glyph `Text` items now use `root.foreground`.
+- Each strip item is now a **bordered box with a background** (`foreground` at 7% fill, 1 px border at 14%; pinned items get a stronger border at 35%), and the glyph renders at `displayLarge` instead of `display`. The strip is taller to fit (`recentsHeight` is `cellSize + 24` instead of a fixed 62).
+- The **selected** strip item gets the selection background and the accent border, and its **name** appears on the "Recently used" line: the first two words in the foreground colour, the rest muted. For `—`: **em dash** mdash emdash long horizontal bar. For 😀: **grinning face** smile happy. The names come from the existing search keywords in `emoji-data.json` (`glyphNames`, built once when the data loads); there is no separate name field in the data, so these are the search words rather than a curated name.
+
+## 2. Keyboard access to the strip
+
+- **Up** from the grid's first row moves focus into the strip (on its first item, or the last one you were on).
+- **Left / Right** move between items (pinned first, then recent), stopping at the ends.
+- **Down** returns to the grid, on the cell you left.
+- **Enter** pastes the strip item. **⌥P** pins / unpins it. Page Up / Page Down also leave the strip.
+- Focus leaves the strip when you type, change category, reopen, move the mouse over the grid, or when the strip disappears (search). The grid highlight is hidden while the strip has focus, so only one thing looks selected.
+- The footer now reads `Enter paste · ⌥P pin · ↑ recent · ⌥1–0 or Tab category · Esc close`.
+
+## 3. Standing rule: the clipboard picker
+
+Checked for both problems:
+- **Invisible pinned items:** none. Pinned clipboard items are normal rows in the main list (hoisted to the top by `ClipboardHistory.js`), with the same explicit text colour as every other row, a 📌 marker and a "Pinned ⌥P" button in the detail pane. Screenshots from the last round show a pinned row clearly.
+- **Unreachable pinned area:** none. There is no separate pinned strip. The pinned rows are the first rows of the list, so Up / Down / Home reach them and Enter pastes them.
+- **No change made** to the clipboard picker. One edge case I did not fix: a pinned text item that is only whitespace would render as an empty-looking row.
+
+## Verified live
+
+One `omarchy restart shell` per code change (two in total), real opens of the emoji picker, keys via `wtype`, screenshots of the strip. Your real pins were used: `["—"]`. To test Left / Right I pinned 😀 temporarily and unpinned it afterwards; `emoji-pins.json` was checked afterwards and is `["—"]` again.
+
+- Strip at rest: the em dash is a bordered box with a light glyph and a pin marker.
+- Up from the first row: the em dash box takes the accent border, the grid cursor disappears, and `em dash mdash emdash long horizontal bar` appears on the label line.
+- Right: moves to 😀 and the line reads `grinning face smile happy`. Left goes back. Down returns the highlight to the grid's first cell. Pinning from inside the strip (⌥P) removed 😀 from the strip.
+- Name line first rendered too low (baseline anchoring); fixed to centre on the label and rechecked after a restart.
+
+## Not verified
+
+- **Enter on a strip item.** I did not press it: it pastes into the focused window, which here is this session. It goes through the same `activateGlyph` the strip click already used.
+- **A long strip** (many recents) scrolling horizontally with Left / Right. Only two items existed; the scroll call is `positionViewAtIndex(..., Contain)`.
+- **Feel and the look of the boxes** beyond what the screenshots show.
