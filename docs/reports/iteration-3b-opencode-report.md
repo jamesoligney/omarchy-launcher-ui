@@ -9,7 +9,7 @@ Scope: **Part B** (emoji picker, clipboard picker, bar widgets) and **Part C** (
 ## Summary
 
 - The emoji and clipboard pickers were cloned to user plugins (`jimmy.emojis`, `jimmy.clipboard`), rebuilt to Vicinae parity, and given the launcher's design tokens. They are reachable by `Super+Ctrl+E` / `Super+Ctrl+V` (no bar icons).
-- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **reworked into a physics spring + multi-property motion** (`SpringAnimation` for scale, plus a y-rise, opacity, scrim and content-lag on offset curves) per James's live checks, verified with scale and y traces.
+- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **reworked into a physics `SpringAnimation` spring** — currently an exaggerated scale-only "boink" (peak ~1.17, undershoot ~0.88) to be reined in step by step per James's live checks.
 - Glass opacity was lowered from `0.84` to `0.70` so the wallpaper shows through the launcher and both pickers more clearly.
 - `emojis.json` (dead, superseded by `emoji-data.json`) was removed from the emoji clone after confirming nothing references it.
 
@@ -21,14 +21,12 @@ No stock files under `/usr/share/omarchy` were edited. Reload was `omarchy resta
 
 Follow-up changes, made and verified after James looked at the build live:
 
-1. **Animation — physics spring + multi-property motion.** Piecewise scale keyframes (a bigger peak) still read as mechanical, so scale is now a real QML `SpringAnimation` — `spring: 4.0`, `damping: 0.2`, `mass: 1.0`, `epsilon: 0.02`, starting from `scale 0.85` — so the decay is physics, not a timetable. The other properties move on their own slightly-offset curves: the card **rises 8 px into place** (`yOffset 8 → 0`, 280 ms), the **glass fades in** (`opacity`, 190 ms), the **scrim** fades on its own curve (210 ms), and the **inner content lags the glass** (`contentOpacity`, 240 ms). Close stays fast (unchanged).
-   - Note: Qt's `SpringAnimation.damping` is a coefficient, not a ratio — the critical value is `2·√(spring·…)`, so `0.35`/`0.8` were effectively overdamped (no oscillation); `0.2` with `spring 4.0` is underdamped and visibly oscillates. (Confirmed against the Qt `qquickspringanimation.cpp` source.)
+1. **Animation — exaggerated "boink" (scale-only this round).** New direction from James: start exaggerated and rein in, not the other way round. The multi-property motion (y-rise, content-lag) was removed; the open is now scale-only — a real QML `SpringAnimation` with `spring: 4.0`, `damping: 0.06`, `mass: 1.0`, `epsilon: 0.02`, starting from `scale 0.75`. Low damping makes it overshoot well past 1.0, undershoot clearly below, and ring ~3 times before settling. Card and scrim still fade in (160 ms) so it doesn't pop. Close stays fast (unchanged).
+   - Note: Qt's `SpringAnimation.damping` is a coefficient, not a ratio — the critical value is `2·√(spring·…)`, so `0.35`/`0.8` were effectively overdamped (no oscillation); `0.06` with `spring 4.0` is deeply underdamped. (Confirmed against the Qt `qquickspringanimation.cpp` source.)
 2. **Glass — more transparent.** Lowered `panel-background-alpha` from `0.84` to `0.70` in `~/.config/omarchy/shell.toml`. This is the single token the launcher and both pickers read, so all three now let more wallpaper (and blur) through.
 3. **Bar icons — removed.** `jimmy.emojis` and `jimmy.clipboard` were removed from the bar tray, and both plugins were reverted to pure overlays (`kinds: ["overlay"]`, `BarWidget.qml` deleted). They remain reachable by `Super+Ctrl+E` / `Super+Ctrl+V`.
 
-Verification (scale + y traces on a live open):
-- Scale (physics spring): `0.850 → 0.860 → … → 1.036 (peak) → 1.033 → … → 0.998 → 0.991 (undershoot) → 1.000 (settle)`, then close `1.000 → … → 0.970`. The overshoot past 1.0 to **1.036** and the dip below to **0.991** is a real decaying oscillation.
-- Rise (`yOffset`): `8.0 → 7.2 → 6.6 → … → 0`.
+Verification (scale trace on a live open): `0.750 → … → 1.172 (peak) → … → 0.882 (undershoot) → … → 1.080 (2nd peak) → … → 0.945 (2nd undershoot) → … → 1.038 (3rd peak) → … → 1.000 (settle)`, then close `1.000 → … → 0.970`. Three decaying oscillations — unmistakably bouncy.
 
 ---
 
@@ -42,7 +40,7 @@ The v2 open animation animated `card.scale` with `Easing.OutBack` and `overshoot
 
 `~/.config/omarchy/plugins/jimmy.menu/Menu.qml` — replaced the single `Easing.OutBack` scale animation inside `openAnim` with an explicit `SequentialAnimation` that drives past 1.0 and settles:
 
-- **Open:** `card.scale` `0.96 → 1.04` over 150 ms (`Easing.OutCubic`), then `1.04 → 1.0` over 90 ms (`Easing.OutCubic`). Card and scrim opacity `0 → 1` over 130 ms. *(Superseded — see Tuning round; the final animation is a physics `SpringAnimation` for scale plus multi-property motion.)*
+- **Open:** `card.scale` `0.96 → 1.04` over 150 ms (`Easing.OutCubic`), then `1.04 → 1.0` over 90 ms (`Easing.OutCubic`). Card and scrim opacity `0 → 1` over 130 ms. *(Superseded — see Tuning round; the final animation is a physics `SpringAnimation` for scale.)*
 - **Close (unchanged, faster):** `card.scale → 0.97` and opacity/scrim `→ 0` over 100 ms (`Easing.InCubic`).
 
 Backup of the pre-change file: `~/.config/omarchy/plugins/jimmy.menu/Menu.qml.bak.3b-anim`.
@@ -94,7 +92,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 - `em dash` → `—`, glyph-character search, category counts, and pin/recency ordering all pass in Node against the real `emoji-data.json`.
 - Clipboard picker opens and renders the list (bright text pixels + accent).
 - **Theme re-tint:** card glass background shifted Afterburn `(14,15,13)` → Catppuccin `(30,30,45)` on `omarchy theme set catppuccin`, then returned on switch back to Afterburn.
-- **Animation spring:** scale trace `0.85 → 1.036 (peak) → 0.991 (undershoot) → 1.0` (journal) — a physics `SpringAnimation` decaying oscillation — and `yOffset` rise `8 → 0`.
+- **Animation spring:** scale trace `0.75 → 1.172 (peak) → 0.882 (undershoot) → 1.080 → 0.945 → 1.038 → 1.0` (journal) — a physics `SpringAnimation` ringing through ~3 oscillations.
 - **Glass:** lowering `panel-background-alpha` to `0.70` shifted the emoji card background from `(14,15,13)` to `(15,16,15)` — more wallpaper bleeding through.
 - `emojis.json` removal did not break the picker (grid still renders after removal).
 
@@ -107,7 +105,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 
 ## What still needs James to check by eye
 
-1. **The spring** — does it read as a natural decaying oscillation and not cartoonish? Scale is a `SpringAnimation` (`spring 4.0, damping 0.2`) from `0.85`, with a y-rise and offset opacity/scrim/content curves; easy to tune (`spring`/`damping` in `openAnim`) if he wants more or less bounce.
+1. **The boink** — this round is deliberately exaggerated (peak ~1.17, undershoot ~0.88, ~3 rings). James will judge by eye and say when to rein it in: raise `damping` (e.g. `0.06 → 0.15`) and/or raise `spring` to shorten the ring, and/or raise the start `scale` toward `0.85` to shrink the swing.
 2. **The pickers' look** — glass/radius-16/blur and layout of the emoji grid + clipboard list/detail.
 3. **Paste, pin, and Pause** in real use.
 
