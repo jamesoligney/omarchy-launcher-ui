@@ -9,7 +9,7 @@ Scope: **Part B** (emoji picker, clipboard picker, bar widgets) and **Part C** (
 ## Summary
 
 - The emoji and clipboard pickers were cloned to user plugins (`jimmy.emojis`, `jimmy.clipboard`), rebuilt to Vicinae parity, and given the launcher's design tokens. They are reachable by `Super+Ctrl+E` / `Super+Ctrl+V` (no bar icons).
-- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **retuned to a springier `0.96 → 1.08 → 1.0`** per James's live check, verified with a scale trace and a screen recording.
+- The launcher's open animation was **fixed** (the v2 bounce was mathematically invisible) and then **reworked into a real spring oscillation** (`0.96 → 1.09 → 0.985 → 1.0`) per James's live checks, verified with scale traces and a screen recording.
 - Glass opacity was lowered from `0.84` to `0.70` so the wallpaper shows through the launcher and both pickers more clearly.
 - `emojis.json` (dead, superseded by `emoji-data.json`) was removed from the emoji clone after confirming nothing references it.
 
@@ -17,15 +17,15 @@ No stock files under `/usr/share/omarchy` were edited. Reload was `omarchy resta
 
 ---
 
-## Tuning round (James's live check)
+## Tuning round (James's live checks)
 
-Three follow-up changes, made and verified after James looked at the build live:
+Follow-up changes, made and verified after James looked at the build live:
 
-1. **Animation — springier.** The first fix (`0.96 → 1.04 → 1.0`) read as mechanical: the two `Easing.OutCubic` stages met at a velocity kink (the zoom ended at zero velocity and the settle began at full velocity), so it stepped rather than sprang. Retuned to `card.scale 0.96 → 1.08` (150 ms `OutCubic`) then `1.08 → 1.0` (140 ms `InOutQuad`). The overshoot peak is now **1.08** (was 1.04), and `InOutQuad` starts the settle at zero velocity, so the two stages join smoothly and read as one spring return. Close stays fast (unchanged).
+1. **Animation — now a real spring.** The first fixes (`0.96 → 1.04 → 1.0`, then `0.96 → 1.08 → 1.0`) still read as mechanical: a single overshoot that "goes out and comes back once" isn't a spring. Final rework is an explicit **three-stage decaying oscillation** — `card.scale 0.96 → 1.09` (140 ms `OutCubic`, zoom + peak), then `1.09 → 0.985` (120 ms `InOutSine`, returns through 1.0 and **undershoots below it**), then `0.985 → 1.0` (80 ms `InOutQuad`, final settle). Each stage starts at zero velocity so the whole path is one smooth oscillation. Close stays fast (unchanged).
 2. **Glass — more transparent.** Lowered `panel-background-alpha` from `0.84` to `0.70` in `~/.config/omarchy/shell.toml`. This is the single token the launcher and both pickers read, so all three now let more wallpaper (and blur) through.
 3. **Bar icons — removed.** `jimmy.emojis` and `jimmy.clipboard` were removed from the bar tray, and both plugins were reverted to pure overlays (`kinds: ["overlay"]`, `BarWidget.qml` deleted). They remain reachable by `Super+Ctrl+E` / `Super+Ctrl+V`.
 
-Verification of the retuned animation (scale trace on a live open): `0.960 → … → 1.080 → 1.079 → 1.078 → … → 1.000`, then close `1.000 → 0.998 → … → 0.982`. The settle's first frames (`1.080 → 1.079 → 1.078`) confirm it begins at rest, unlike the previous `1.040 → 1.029` jump.
+Verification of the final spring (scale trace on a live open): `0.960 → … → 1.090 (peak) → 1.088 → 1.084 → … → 0.985 (undershoot) → 0.986 → 0.990 → … → 1.000 (settle)`, then close `1.000 → 0.998 → … → 0.977`. The crossing below 1.0 to **0.985** and back up is the oscillation.
 
 ---
 
@@ -39,7 +39,7 @@ The v2 open animation animated `card.scale` with `Easing.OutBack` and `overshoot
 
 `~/.config/omarchy/plugins/jimmy.menu/Menu.qml` — replaced the single `Easing.OutBack` scale animation inside `openAnim` with an explicit `SequentialAnimation` that drives past 1.0 and settles:
 
-- **Open:** `card.scale` `0.96 → 1.04` over 150 ms (`Easing.OutCubic`), then `1.04 → 1.0` over 90 ms (`Easing.OutCubic`). Card and scrim opacity `0 → 1` over 130 ms.
+- **Open:** `card.scale` `0.96 → 1.04` over 150 ms (`Easing.OutCubic`), then `1.04 → 1.0` over 90 ms (`Easing.OutCubic`). Card and scrim opacity `0 → 1` over 130 ms. *(Superseded — see Tuning round; the final animation is a three-stage `0.96 → 1.09 → 0.985 → 1.0` spring.)*
 - **Close (unchanged, faster):** `card.scale → 0.97` and opacity/scrim `→ 0` over 100 ms (`Easing.InCubic`).
 
 Backup of the pre-change file: `~/.config/omarchy/plugins/jimmy.menu/Menu.qml.bak.3b-anim`.
@@ -91,7 +91,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 - `em dash` → `—`, glyph-character search, category counts, and pin/recency ordering all pass in Node against the real `emoji-data.json`.
 - Clipboard picker opens and renders the list (bright text pixels + accent).
 - **Theme re-tint:** card glass background shifted Afterburn `(14,15,13)` → Catppuccin `(30,30,45)` on `omarchy theme set catppuccin`, then returned on switch back to Afterburn.
-- **Animation bounce:** scale trace `0.96 → 1.08 → 1.0` (journal) and card-width growth past full then settle (screen recording). Retuned trace (peak `1.080`, zero-velocity settle start) recorded after the tuning round.
+- **Animation spring:** scale trace `0.96 → 1.09 → 0.985 → 1.0` (journal) — a decaying oscillation with a visible undershoot — and card-width growth past full then settle (screen recording).
 - **Glass:** lowering `panel-background-alpha` to `0.70` shifted the emoji card background from `(14,15,13)` to `(15,16,15)` — more wallpaper bleeding through.
 - `emojis.json` removal did not break the picker (grid still renders after removal).
 
@@ -104,7 +104,7 @@ Cloned `omarchy.clipboard` → `~/.config/omarchy/plugins/jimmy.clipboard/` (sto
 
 ## What still needs James to check by eye
 
-1. **The bounce** — does it read as a spring and not cartoonish? The overshoot peak is 1.08 (8% past full, ~290 ms); easy to tune (the two `to`/`duration` values in `openAnim`) if he wants more or less.
+1. **The spring** — does it read as a natural decaying oscillation and not cartoonish? The path is `0.96 → 1.09 (peak) → 0.985 (undershoot) → 1.0` over ~340 ms; easy to tune (the three `to`/`duration` values in `openAnim`) if he wants more or less.
 2. **The pickers' look** — glass/radius-16/blur and layout of the emoji grid + clipboard list/detail.
 3. **Paste, pin, and Pause** in real use.
 
