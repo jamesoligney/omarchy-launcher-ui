@@ -112,14 +112,16 @@
     "jimmy.menu",
     "jimmy.emojis",
     "jimmy.clipboard",
-    "jimmy.reminders"
+    "jimmy.reminders",
+    "jimmy.battery"
   ],
   "disabledPlugins": [
     "omarchy.lock",
     "omarchy.menu",
     "omarchy.emojis",
     "omarchy.clipboard",
-    "omarchy.reminders"
+    "omarchy.reminders",
+    "omarchy.battery"
   ],
   "dock": {
     "autohide": true,
@@ -209,11 +211,11 @@
       "shimmerScaleMax": 1.45,
       "shimmerScaleMin": 0.75,
       "gradient": [
-        "rgba(cc8affee)",
-        "rgba(691fff00)"
+        "rgba(ff3437ee)",
+        "rgba(df003800)"
       ],
       "gradientPositions": "0 99",
-      "baseColor": "rgba(2d1447dd)"
+      "baseColor": "rgba(470409dd)"
     },
     {
       "clock12": true,
@@ -233,6 +235,9 @@
     },
     {
       "id": "jimmy.apps"
+    },
+    {
+      "id": "jimmy.battery"
     }
   ],
   "version": 1

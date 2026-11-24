@@ -597,3 +597,111 @@ One `omarchy restart shell` per change (three in total), real opens, a temporary
 ## Snapshot
 
 Resynced from live (161 source files, checksums identical before and after, snapshot equals live). New: `plugins/jimmy.apps/`, `plugins/jimmy.reminders/`. Updated: `config/omarchy/shell.json`, `config/omarchy/extensions/omarchy-menu.jsonc`. The resync also picked up live changes made outside this task: a new `ALT + K` "Keep" bind in `bindings.lua`, a 12-hour clock format and new Border FX colours in `shell.json` and `border-fx.lua` (a theme change). Backups kept locally, not in git: `shell.json.bak.anim-1795549920`, `omarchy-menu.jsonc.bak.apps-*`.
+
+---
+
+# Bar polling audit, and the one conversion it justified (2026-11-24)
+
+## Summary
+
+I audited every widget in the live bar (`shell.json` layout and tray drawer), the services behind them, and the launcher, emoji, clipboard, apps and reminders code. **Almost nothing in the bar is polling a local value.** The stock widgets are already built on Quickshell's service APIs (Pipewire, UPower, SystemTray, Bluetooth, NetworkManager, Mpris, Hyprland events, `ToplevelManager`) or are pushed by IPC. The timers that remain are one of five things: a **remote check** with no live source, an **aligned tick**, a **UI debounce or one-shot**, a **panel-open-only refresh**, or a **conditional fallback**. Exactly one standing timer re-read a local value that a live API already signals: the **battery service's 30-second check**. That is converted. I did not manufacture other conversions.
+
+## 1. Audit table
+
+Classes of timer: **R** remote check (network or `checkupdates`), **A** aligned tick, **D** debounce / one-shot, **O** runs only while a panel is open, **F** conditional fallback, **P** real standing poll.
+
+### Stock widgets in the bar
+
+| Widget | Shows | Data source today | Polling |
+|---|---|---|---|
+| Clock (`omarchy.clock`) | date and time | `WallClock.qml` timer armed from epoch ms to the next minute boundary | **A**: wakes once a minute. Deliberately not Quickshell's `SystemClock`: its comment explains `SystemClock` floods the log for an hour at the end of daylight saving |
+| Indicators (`omarchy.indicators`) | row of status dots | each indicator reads a service or runs one command when the host asks it to refresh | **D** 120 ms debounce only |
+|   Do-not-disturb | DND on/off | notifications service property (live) | none |
+|   Night light | on/off | nightlight service property (live) | none |
+|   Stay awake | on/off | idle service property (live; ours is `jimmy.idle`) | none |
+|   Remote session | screen-share peers | remote-session service | **O/F**: service polls `probe.sh` every 2 s **only while a session is active**, because the end of a session raises no event |
+|   Screen recording, Passwordless sudo, Reminder | on/off | one `Process` run when the indicator host signals a refresh (IPC push) | none |
+| Weather (`omarchy.weather`) | temperature, icon | HTTP fetch through `Process`; location file | **R**: every `refreshMinutes`; no push API exists |
+| Microphone | mute state | `Pipewire.defaultAudioSource` + `PwObjectTracker` | none (live) |
+| System update | update pending | `omarchy-update-available` (runs `checkupdates`, which syncs a temp database over the network) | **R**: every 6 h and on IPC `refresh`. A watch on the local pacman database would miss updates published upstream |
+| System tray | app icons | `SystemTray.items` | none (a 250 ms timer is UI settling) |
+| Agents | AI plan usage | per-record `FileView` watchers on `~/.local/state/omarchy/agents/usage/` (live) fed by `omarchy-agent-usage-update` | **R**: that updater runs every `refreshIntervalSec` (shorter near a limit); provider usage is a remote value |
+| Keyboard layout | layout label | Hyprland `onRawEvent`, `InputDevices.onChanged`, `hyprctl devices` run on those events | **D** 600 ms, **F** 10 s retry only while the layout is unresolved, 5 s stall guard |
+| Bluetooth | adapter/device state | Quickshell Bluetooth API | **O**: panel timers only while open (discovery retry 1 s) |
+| Network | connection, signal | NetworkManager / Networking API | **O**: details 1.5 s, band 4 s, signal 5 s while open; **F** 10 s connectivity check only when restricted |
+| Audio | volume, output | Pipewire, Mpris | **O**: 5 s refresh while the panel is open |
+| Power | battery, profile | UPower | **O**: 5 s refresh while the panel is open |
+| Monitor (tray) | brightness | brightness service | **O**: 5 s while open; 180 ms debounce |
+
+### Our own (`jimmy.*`) bar code
+
+| Widget / service | Shows | Data source | Polling |
+|---|---|---|---|
+| `jimmy.workspaces` | occupied workspaces | `Hyprland.workspaces/monitors/toplevels`, `onRawEvent`, `FileView` watch on `monitor-workspaces` | none. `refreshMonitors/Workspaces` are called from events, not timers |
+| `jimmy.active-window` | app and title | `ToplevelManager.activeToplevel` | none |
+| `jimmy.idle` (service) | idle, lock, screensaver | Wayland `IdleMonitor`, Hyprland `onRawEvent`, `FileView` on the stay-awake file | **D**: one-shot timers only |
+| `jimmy.menu` bar button | opens the launcher | static | none |
+| **`jimmy.battery` (service)** | low-battery warning, power profile | UPower signals via the new shared `PowerEvents` | **was P (30 s). Now none** |
+
+### Third-party widgets in the bar (upstream code, not ours)
+
+| Widget | Data source | Polling (from `interval:` in their code; not read in depth) |
+|---|---|---|
+| Glyph menu, divider | static | none |
+| Superwhisper panel | superwhisper CLI/status | service timers 500 ms, 4 s, 15 s |
+| Omapop | service + popup | 60 ms to 4 s (UI and delays) |
+| Omarchy FX | settings panel | 180 ms debounce |
+| Scratchpad | notes panel | 1 s (panel) |
+| Matrix screens | service + rain | 1.5 s service; rain 250 ms to 30 s |
+| Tricky Tiles | settings panel | 250 ms debounce, 3 s confirm |
+| Lock explorer | service | 250 ms to 5 s |
+| Border FX (service) | Hyprland border control | 150 and 200 ms debounce |
+| AI usage notch (service) | provider usage | 15 min provider run, 30 s store, 1 s sessions |
+
+### Services behind the bar
+
+| Service | Source | Polling |
+|---|---|---|
+| Notifications | `NotificationServer` | none |
+| Media | Mpris + Pipewire | 120 ms debounce |
+| Nightlight | `Process` on demand | none |
+| Remote session | `probe.sh` | 2 s only while a session is active |
+
+## 2. What changed
+
+**Converted: the battery service** (`jimmy.battery`, made with `omarchy plugin clone omarchy.battery`).
+- Removed the 30 s `Timer` that re-ran the low-battery check. That is 2,880 wakeups a day on a value UPower already reports.
+- Added **`jimmy.shared/PowerEvents.qml`**: one `changed()` signal driven by `UPower.onBatteryChanged` and the display device's `percentageChanged` and `stateChanged`. It is shared on purpose: the later bar restructure's power and battery widgets can read power the same way instead of each growing their own timer. The service uses it as `PowerEvents { onChanged: root.checkBattery() }` and runs one check on startup. The power-profile handling is unchanged.
+- The stock `omarchy.battery` is disabled by the clone command. `shell.json` changed only by that.
+
+**Not converted, and why** (each is in the table):
+- Remote checks (system update, weather, agents usage, AI usage notch) have no live source. A file watch would hide new upstream updates.
+- The clock's aligned tick is not polling, and `SystemClock` is known to misbehave at the end of daylight saving.
+- Remote-session's 2 s poll runs only while a session is active and exists because the session's end raises no event.
+- Panel-open refreshes (network 1.5 s, band 4 s, power 5 s and so on) run only while a panel is open. Moving them to live APIs means rewriting those panels (the network panel is about 2,000 lines), which belongs in the restructure itself.
+- Keyboard layout is already event-driven; its timers are a debounce and a retry that runs only when the layout cannot be read.
+- Third-party widgets are upstream code; I did not fork them.
+
+## 3. Standing rule: launcher, emoji, clipboard, apps, reminders
+
+Nothing in these polls.
+- **Launcher:** the only timer is the 115 ms close grace. Bind data (`bindings.lua`, `omarchy menu keybindings --print`) is read once on each open by design, and the menu files are `FileView` watchers.
+- **Emoji, apps, reminders:** one-shot close timers only; emoji data is read once.
+- **Clipboard:** capture is event-driven (`wl-paste --watch` through `capture.sh`); the history file is a watched `FileView`; the one 1 s timer restarts a watcher that has exited, which is supervision, not polling.
+
+## Verified live
+
+- `omarchy plugin clone omarchy.battery`, edit, then one `omarchy restart shell` with a temporary log line in `checkBattery`.
+- On startup the log showed the first check at `-1%` (UPower not ready), then **two further checks at 79% one second later, driven by UPower's percentage and state signals**, not a timer (there is no timer left). Those signals are the live path working.
+- Over the next 3 minutes, with the laptop plugged in and the charge steady, UPower emitted no battery changes and the service ran no checks: zero activity between changes.
+- The temporary log was removed (0 matches), the shell restarted, the clone is enabled, and the journal shows no errors from it.
+
+## Not verified
+
+- **A real discharge or unplug event.** The laptop stayed on AC at a steady 79%, so I saw the startup transition but not a percentage drop or a power-source change driving a check. The low-battery notification at 10% and the AC/battery profile switch are unchanged code but were not exercised.
+- The third-party and remote-session rows come from reading timers and manifests, not from watching each widget run.
+- The power, network and audio panels' open-only refresh rates are from their code, not measured.
+
+## Snapshot
+
+Resynced from live (165 source files, checksums identical before and after, snapshot equals live): new `plugins/jimmy.battery/`, `plugins/jimmy.shared/PowerEvents.qml`; updated `config/omarchy/shell.json` (the battery clone) and `config/hypr/border-fx.lua` (a live Border FX colour change from a theme switch, not mine). Local backups, not in git: `shell.json.bak.bar-1795556002` (taken after the clone; the earlier `shell.json.bak.anim-1795549920` predates the apps and battery changes). No runtime state was added to git.
