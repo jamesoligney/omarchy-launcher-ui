@@ -179,4 +179,6 @@
   "style.bar.glyph.spider_web": {"icon":"󰯊","label":"Spider web","action":"omarchy bar set io.github.smoothpixels.glyph-menu mark spider_web"},
   "style.bar.glyph.custom": {"icon":"\uf040","label":"Custom text\u2026","action":"omarchy-launch-floating-terminal-with-presentation '$HOME/.config/omarchy/plugins/io.github.smoothpixels.glyph-menu/tools/set-custom.sh'"},
   // glyph-menu: end
+  // jimmy.apps: the Apps row opens the apps window with the shared card motion.
+  "apps": {"icon":"\udb80\udc3b","label":"Apps","aliases":["app","applications"],"provider":"apps","action":"omarchy-shell shell summon jimmy.apps"}
 }

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "jimmy.apps",
+  "name": "Apps window",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "All-apps grid, opened from the launcher's Apps row, with the shared card motion",
+  "kinds": [
+    "menu"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Apps.qml"
+  }
+}

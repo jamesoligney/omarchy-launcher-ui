@@ -535,3 +535,65 @@ Test windows and the two local HTML fixtures were closed and removed afterward.
 - Terminals other than Ghostty. Only Ghostty was pasted into.
 - A paste James types himself. The checks above drove the pickers with `wtype` and read the result back from the window title or the terminal's output file.
 - Whether Ctrl+V is the right chord inside a Floorp page that has rebound paste. The test pages used the default content-editable field.
+
+---
+
+# Apps window and reminders get the shared animation; audit of every other surface (2026-11-24)
+
+## What was wrong
+
+The launcher's **Apps** row runs `omarchy-shell omarchy.dock apps`, which opens the stock dock's app grid (layer `omarchy-dock-apps`). That grid only fades (150 ms); it never had the squash-and-stretch.
+
+## What changed
+
+1. **Apps window: new plugin `jimmy.apps`** (`kinds: ["menu"]`), built from the stock `AppGrid.qml` with the shared `jimmy.shared/CardMotion`: same X/Y springs, same 160 ms fade, same 100 ms close, no copied values. The launcher's Apps row now runs `omarchy-shell shell summon jimmy.apps` (one row override at the end of `~/.config/omarchy/extensions/omarchy-menu.jsonc`; the file was backed up first).
+2. **Reminders: `jimmy.reminders`**, made with Omarchy's own `omarchy plugin clone omarchy.reminders`, then given `CardMotion` the same way as the emoji picker. The stock `omarchy.reminders` is disabled by the clone command; the `omarchy-shell` target id still routes to the clone.
+3. Both use the same close handling as the pickers: a 115 ms `closing` window so the 100 ms close can play, and keyboard focus released the moment they close.
+
+## What I tried first and reverted: cloning the dock
+
+I cloned `omarchy.dock` (it contains the grid) with `omarchy plugin clone`, wired `CardMotion` into its `AppGrid`, and traced the motion, which was right. But the grid was **empty ("No apps match")**. Cause, from `shell.qml`: a third-party plugin only gets `shell.appLibrary` if it is a `menu`-kind plugin (`manifestHasKind(manifest, "menu")`), and the clone is a `service`. A dock clone also never sees `shell.shellConfig`, which is where the dock's own settings (pinned apps, autohide, position) live, so cloning the dock would have broken the real dock, not just the grid. I removed the clone with `omarchy plugin remove jimmy.dock --yes` (which restored `omarchy.dock`), deleted the leftover hidden backup folder the tool made, and confirmed `shell.json` differs from its pre-change backup only by the reminders clone and `jimmy.apps`. That is why the apps window is a separate `menu`-kind plugin.
+
+## Behaviour change to know about
+
+`jimmy.apps` is not attached to the dock, so **dragging an app out of the grid onto the dock does nothing** (the drag start is guarded off). The **dock's own "apps" button still opens the stock, static grid**, and so does the CLI `omarchy-shell omarchy.dock apps`. Only the launcher's Apps row (and `summon jimmy.apps`) get the animated window. I could not change the dock button without cloning the dock, for the reason above.
+
+## Audit: every surface I found
+
+Found by listing every `OverlayWindow` and `WlrLayershell.namespace` in `/usr/share/omarchy/shell` and `~/.config/omarchy/plugins`.
+
+**Already had the shared animation**
+- Launcher (`omarchy-menu`, `jimmy.menu`), emoji picker (`omarchy-emojis`), clipboard picker (`omarchy-clipboard`).
+
+**Was missing, fixed this pass**
+- Apps window (`omarchy-dock-apps`), via `jimmy.apps`, from the launcher Apps row.
+- Reminders dialog (`omarchy-reminders`), via `jimmy.reminders`.
+
+**Left static or on its own motion, and why**
+- **Dock's own apps button / stock AppGrid:** cannot be cloned (see above). Still static.
+- **Image picker** (`omarchy-image-selector`, theme / wallpaper carousel, 905 lines): no scale motion, but it is a carousel, not a card, and its reveal is gated on frames rendered and images decoded (`layoutSettled`), so the shared motion would have to be re-timed to that reveal. I did not attempt it without being able to drive its theme flow here; it needs its own pass.
+- **Wi-Fi QR panel** (`omarchy-network-qr`): a floating code on a dark scrim with no card to scale.
+- **Polkit authentication dialog** (`omarchy-polkit`): replacing the system auth agent with a clone is a security-sensitive change; it has its own shake motion on a wrong password.
+- **Notifications, OSD, bar popup panels (`KeyboardPanel`), speed-test overlay:** transient indicators and popups with their own purpose-built motion (toast slide and scale, fade, edge slide). They are not menus or dialogs.
+- **Confirm dialogs inside the three pickers and the apps window:** they live inside an already-animated card.
+- **Dock window, bar, background, lock screen:** not dialogs.
+- **Third-party surfaces** (`omaland`, `omapop`, `fathom`, `lock-explorer`, `ai-usage-notch`, `flea-shelf`, matrix screens): upstream code, not ours. I did not inspect their animation.
+
+## Verified live
+
+One `omarchy restart shell` per change (three in total), real opens, a temporary trace line in `CardMotion` that was removed afterwards (0 matches in every plugin folder):
+
+- **`jimmy.apps`:** same X/Y curve as the launcher, `0.8000/0.7000` at 8 ms, `1.0456/1.0182` at 133 ms, `1.0436/1.0577` at 175 ms (Y peak), `0.9873/1.0001` at 300 ms, `1.0000/0.9997` at 675 ms, card opacity 1.00 by about 175 ms. The grid shows all installed apps. The layer is gone after hide.
+- **Launcher to Apps window:** typing "apps" and pressing Enter in the launcher opened the `omarchy-dock-apps` layer (checked with `hyprctl layers`).
+- **`jimmy.reminders`:** same curve (`0.8035/0.7037` at 16 ms, peak `1.0493/1.0306` at 141 ms, Y peak `1.0588` at 183 ms); renders the "Remind in minutes…" card; Esc dismisses it and the layer is gone.
+
+## Not verified
+
+- Selecting and launching an app from `jimmy.apps` (Enter on a cell), the right-click app menu, and uninstall: copied unchanged from the stock grid, not exercised.
+- Setting a reminder through the clone end to end.
+- The feel of either animation by eye.
+- That the stock dock button still works unchanged after the restore: `omarchy.dock` is enabled again, but I did not press the button.
+
+## Snapshot
+
+Resynced from live (161 source files, checksums identical before and after, snapshot equals live). New: `plugins/jimmy.apps/`, `plugins/jimmy.reminders/`. Updated: `config/omarchy/shell.json`, `config/omarchy/extensions/omarchy-menu.jsonc`. The resync also picked up live changes made outside this task: a new `ALT + K` "Keep" bind in `bindings.lua`, a 12-hour clock format and new Border FX colours in `shell.json` and `border-fx.lua` (a theme change). Backups kept locally, not in git: `shell.json.bak.anim-1795549920`, `omarchy-menu.jsonc.bak.apps-*`.

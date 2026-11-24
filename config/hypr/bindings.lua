@@ -111,3 +111,6 @@ o.rebind("SUPER + W", "Close window or browser tab", function()
   end
 end)
 -- close-window-or-tab: end
+
+-- App shortcut, made from the Omarchy menu
+o.bind("ALT + K", "Keep", { launch = "gtk-launch 'Keep.desktop'" })
