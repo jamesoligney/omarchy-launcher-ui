@@ -1,0 +1,88 @@
+#!/bin/bash
+# omarchy-launcher-paste — one place for "put it on the clipboard, then paste it".
+#
+# Stock Omarchy pastes with Shift+Insert. That is wrong for two classes of app:
+#
+#   * Firefox-family browsers (Floorp, Firefox, LibreWolf, Zen, Waterfox) do
+#     not implement Shift+Insert in editable fields at all — they paste on
+#     Ctrl+V. This is why the emoji and clipboard pickers closed and pasted
+#     nothing into Floorp while working fine in Helium.
+#   * Terminal emulators bind Shift+Insert to the PRIMARY selection, not the
+#     clipboard (Ghostty: `shift+insert = paste_from_selection`), so a copied
+#     clipboard entry never lands there. Ctrl+Shift+V is the clipboard paste
+#     chord in terminals.
+#
+# Everything else keeps the stock Shift+Insert, so the rest of the desktop
+# behaves exactly as before.
+#
+# Usage:
+#   omarchy-launcher-paste send
+#   omarchy-launcher-paste text [--history-index N] | [text]
+#   omarchy-launcher-paste file <mime> <path>
+#   omarchy-launcher-paste emoji <glyph>
+
+set -u
+
+omarchy_path=${OMARCHY_PATH:-/usr/share/omarchy}
+paste_delay=${OMARCHY_PASTE_DELAY:-0.15}
+
+is_firefox_family() {
+  local class=$1 comm=$2
+  local class_re='^(one\.ablaze\.floorp|floorp|firefox|firefox-esr|firefox-nightly|navigator|librewolf|io\.gitlab\.librewolf-community|waterfox|zen|zen-browser|app\.zen_browser\.zen|org\.mozilla\.firefox)$'
+  local comm_re='^(floorp|firefox|firefox-bin|navigator|librewolf|waterfox|zen|zen-bin)$'
+  [[ $class =~ $class_re || $comm =~ $comm_re ]]
+}
+
+is_terminal() {
+  local class=$1 comm=$2
+  local class_re='^(com\.mitchellh\.ghostty|ghostty|Alacritty|alacritty|kitty|foot|footclient|org\.wezfurlong\.wezterm|wezterm|WezTerm|org\.gnome\.Terminal|gnome-terminal-server|konsole|org\.kde\.konsole|Xfce4-terminal|xfce4-terminal|tilix|Terminator|terminator)$'
+  local comm_re='^(ghostty|alacritty|kitty|foot|footclient|wezterm-gui|wezterm|gnome-terminal-server|konsole|xfce4-terminal|tilix|terminator)$'
+  [[ $class =~ $class_re || $comm =~ $comm_re ]]
+}
+
+send_paste() {
+  local info class pid comm
+  sleep "$paste_delay"
+  info=$(hyprctl activewindow -j 2>/dev/null) || info=""
+  class=$(jq -r '.class // ""' <<<"$info" 2>/dev/null)
+  pid=$(jq -r '.pid // ""' <<<"$info" 2>/dev/null)
+  comm=""
+  [[ $pid =~ ^[0-9]+$ ]] && comm=$(cat "/proc/$pid/comm" 2>/dev/null)
+
+  if is_firefox_family "$class" "$comm"; then
+    wtype -M ctrl -k v -m ctrl 2>/dev/null || true
+  elif is_terminal "$class" "$comm"; then
+    wtype -M ctrl -M shift -k v -m shift -m ctrl 2>/dev/null || true
+  else
+    wtype -M shift -k Insert -m shift 2>/dev/null || true
+  fi
+}
+
+case "${1:-}" in
+  send)
+    send_paste
+    ;;
+  text)
+    shift
+    "$omarchy_path/bin/omarchy-clipboard-paste-text" --copy-only "$@" && send_paste
+    ;;
+  file)
+    shift
+    "$omarchy_path/bin/omarchy-clipboard-paste-file" --copy-only "$@" && send_paste
+    ;;
+  emoji)
+    glyph=${2:-}
+    [[ -n $glyph ]] || exit
+    # Copy the emoji, paste it, then release the clipboard so the emoji does
+    # not stay stuck on it (same behaviour as the stock emoji insert).
+    printf '%s' "$glyph" | wl-copy --type text/plain --sensitive --foreground &
+    copy_pid=$!
+    send_paste
+    sleep 0.2
+    kill "$copy_pid" 2>/dev/null || true
+    ;;
+  *)
+    echo "usage: omarchy-launcher-paste send|text|file|emoji ..." >&2
+    exit 2
+    ;;
+esac

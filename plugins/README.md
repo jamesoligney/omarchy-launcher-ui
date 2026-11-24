@@ -11,6 +11,7 @@ Copies of the user-authored Omarchy plugins, taken 2026-11-23.
 | `jimmy.clipboard/` | Clipboard picker |
 | `jimmy.shared/` | `CardMotion.qml`, the open/close animation all three pickers import |
 | `jimmy.workspaces/`, `jimmy.active-window/`, `jimmy.idle/` | The user's own bar and idle plugins |
+| `bin/omarchy-launcher-paste` | Shared paste helper the emoji and clipboard pickers call (2026-11-24). Lives at `~/.local/bin/omarchy-launcher-paste` |
 
 Not included: `*.bak*` files, and third-party plugins (see `../config/omarchy/third-party-plugins.tsv`). Runtime state is never in git.
 
@@ -20,6 +21,7 @@ The three pickers import `../jimmy.shared`, so restore the folders together.
 
 ```bash
 cp -a plugins/jimmy.* ~/.config/omarchy/plugins/
+install -m 755 plugins/bin/omarchy-launcher-paste ~/.local/bin/omarchy-launcher-paste
 omarchy restart shell
 ```
 

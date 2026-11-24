@@ -12,6 +12,10 @@ Item {
   id: root
 
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  // Shared paste helper. Firefox-family apps get Ctrl+V (Floorp does not
+  // implement Shift+Insert). Terminals get Ctrl+Shift+V (Shift+Insert there
+  // is the primary selection). Everything else keeps stock Shift+Insert.
+  property string pasteCmd: Quickshell.env("HOME") + "/.local/bin/omarchy-launcher-paste"
   property var shell: null
   property var manifest: null
 
@@ -303,14 +307,14 @@ Item {
     if (!glyph) return
     root.recordRecent(glyph)
     root.dismiss()
-    Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-menu-emoji-insert", glyph])
+    Quickshell.execDetached([root.pasteCmd, "emoji", glyph])
   }
 
   function activateGlyph(glyph) {
     if (!glyph) return
     root.recordRecent(glyph)
     root.dismiss()
-    Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-menu-emoji-insert", glyph])
+    Quickshell.execDetached([root.pasteCmd, "emoji", glyph])
   }
 
   ListModel { id: displayModel }

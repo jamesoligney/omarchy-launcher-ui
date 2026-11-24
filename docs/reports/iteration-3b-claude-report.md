@@ -433,6 +433,7 @@ From the repo (details in `plugins/README.md` and `config/README.md`):
 
 ```bash
 cp -a plugins/jimmy.* ~/.config/omarchy/plugins/            # the seven user plugins; restore together
+install -m 755 plugins/bin/omarchy-launcher-paste ~/.local/bin/omarchy-launcher-paste
 cp -a config/hypr/. ~/.config/hypr/ && hyprctl reload
 cp -p config/omarchy/shell.json config/omarchy/shell.toml config/omarchy/tricky-tiles.json config/omarchy/omarchy-fx.conf ~/.config/omarchy/
 cp -p config/omarchy/extensions/omarchy-menu.jsonc ~/.config/omarchy/extensions/
@@ -450,3 +451,87 @@ From the local state backup (machine only): see `/home/jimmy/.local/state/omarch
 ## Standing rule added
 
 `AGENTS.md` now has a "Backups — standing rule" section: backups must be complete, audit first, never commit a fraction; name anything left out and why; never put runtime state in git, back it up locally in a timestamped mode-700 folder; verify live files unchanged and snapshot equals live.
+
+# Picker paste into Floorp (2026-11-24)
+
+Both pickers closed and pasted nothing into Floorp. The same Enter paste worked in Helium. One shared helper now picks the chord. The launcher does not paste, so it was left alone.
+
+## What happened
+
+Reproduced in a focused Floorp text field, once from the emoji picker and once from the clipboard picker: the picker closed, focus returned to Floorp, and the field did not change.
+
+## Root cause
+
+Both pickers called the stock insert binaries, and both binaries paste with `wtype` `Shift+Insert`:
+
+- Emoji: `omarchy-menu-emoji-insert` copies with `wl-copy --sensitive`, waits 0.15s, sends Shift+Insert, then drops the clipboard.
+- Clipboard text: `omarchy-clipboard-paste-text --shift-insert --history-index`.
+- Clipboard image/file: `omarchy-clipboard-paste-file`, which ends on the same Shift+Insert.
+
+Floorp is Firefox. Firefox-family editable fields do not implement Shift+Insert. They paste on Ctrl+V. Helium (Chromium) does implement Shift+Insert, which is why only Floorp failed.
+
+Floorp being a Flatpak is not the cause. `wtype` delivers the key at the compositor, and the window class `one.ablaze.floorp` was visible to `hyprctl`. Focus is also not the cause: the picker dismisses before the helper runs, the layer drops keyboard focus on dismiss, and the helper waits 0.15s before sending the chord, so the key hits the app underneath.
+
+A second gap showed up while checking terminals. Ghostty binds Shift+Insert to `paste_from_selection` (the primary selection), so a clipboard entry never lands there. Its clipboard paste chord is Ctrl+Shift+V. A direct Shift+Insert into Ghostty pasted the primary selection; Ctrl+Shift+V pasted the clipboard.
+
+## The fix
+
+One helper, `~/.local/bin/omarchy-launcher-paste`. Both pickers call it and nothing else sends a paste chord:
+
+- `jimmy.emojis/Emojis.qml` — `activateIndex` and `activateGlyph` run `omarchy-launcher-paste emoji <glyph>`.
+- `jimmy.clipboard/Clipboard.qml` — Enter runs `omarchy-launcher-paste text --history-index N` or `omarchy-launcher-paste file <mime> <path>`.
+
+The helper copies first (stock `--copy-only` for history text and files; `wl-copy --sensitive` for emoji, same as stock), waits 0.15s, reads `hyprctl activewindow`, and sends:
+
+- Ctrl+V for Firefox-family classes and comms (Floorp, Firefox, LibreWolf, Zen, Waterfox).
+- Ctrl+Shift+V for terminals (Ghostty, Alacritty, kitty, foot, WezTerm, GNOME Terminal, Konsole, Tilix, Terminator).
+- Shift+Insert for everything else, which is the old stock behaviour.
+
+Copy-only (Shift+Enter) still calls the stock binaries and sends no key. The launcher has no paste path.
+
+## Files
+
+Live:
+
+- `~/.local/bin/omarchy-launcher-paste` (new)
+- `~/.config/omarchy/plugins/jimmy.emojis/Emojis.qml`
+- `~/.config/omarchy/plugins/jimmy.clipboard/Clipboard.qml`
+
+Repo snapshot (fallback; live files stay the source):
+
+- `plugins/bin/omarchy-launcher-paste`
+- `plugins/jimmy.emojis/Emojis.qml`
+- `plugins/jimmy.clipboard/Clipboard.qml`
+- `plugins/README.md` (restore now installs the helper)
+
+No stock file under `/usr/share/omarchy` was edited. No debug `console.log` or `ANIMDEBUG` left in the picker or launcher QML. Shell reload was `omarchy restart shell` only.
+
+## Backup
+
+`/home/jimmy/.local/state/omarchy-launcher-backups/20261124-112810-paste-fix` (mode 700). It holds both picker plugins, the launcher clone, `jimmy.shared`, the helper, `shell.json`, `shell.toml`, `bindings.lua`, and `menu-glass.lua`. Checksums before and after the copy matched, and the snapshot matched live at the time. Runtime state (clipboard history, pins, recents, pause flag) was left out on purpose. Not included, and why: themes, the bar, and other plugins are not on the paste path.
+
+After that snapshot, only the two QML comments were reworded so they mention the terminal chord. The paste calls and the helper are byte-for-byte the verified ones.
+
+## Verified live
+
+Done in the session that wrote the helper, against the same helper and the same paste calls. Results read back from the focused app, not from a screenshot of the picker:
+
+- Floorp emoji, search "em dash", Enter: the field became `—`.
+- Floorp clipboard text, search the copied `FLOORP-CLIP-OK-42`, Enter: that string landed after the em dash.
+- Helium emoji, same search, Enter: `—`.
+- Helium clipboard text, search `HELIUM-CLIP-OK-42`, Enter: that string landed.
+- Ghostty, helper text paste of `TERM-HELPER-OK`: the file the terminal was writing received it.
+- Ghostty, clipboard picker, search `GHOSTTY-PICKER-OK-77`, Enter: the terminal received it. Shift+Insert alone would have pasted the primary selection instead.
+- Floorp image row, Enter: the test page title went to `IMG:1:TXT:0`.
+- Helium image row, Enter: the test page title went to `IMG:1:TXT:0`.
+
+The first image attempt on Floorp hit the text row above the image (title `IMG:0:TXT:49`, then a dead `file://` navigation). Moving to the image row and pressing Enter pasted the image. That was selection, not the chord.
+
+Test windows and the two local HTML fixtures were closed and removed afterward.
+
+## Not verified
+
+- Zen, LibreWolf, Waterfox, and the other Firefox-family names in the helper. They are classified and were not opened.
+- Terminals other than Ghostty. Only Ghostty was pasted into.
+- A paste James types himself. The checks above drove the pickers with `wtype` and read the result back from the window title or the terminal's output file.
+- Whether Ctrl+V is the right chord inside a Floorp page that has rebound paste. The test pages used the default content-editable field.
