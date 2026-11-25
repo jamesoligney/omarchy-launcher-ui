@@ -71,8 +71,9 @@ corner-inset             = 18
 gap                      = 3
 # Rounded square rather than pill (window radius is larger).
 radius                   = 9
-padding-x                = 10
-spacing                  = 12
+# Stage 6: airier. Space inside the ends, and between elements.
+padding-x                = 16
+spacing                  = 18
 # Text and glyph size inside the islands.
 font-size                = 16
 # Quiet contract: everything but the active workspace, the app name and
@@ -82,15 +83,13 @@ quiet-alpha              = 0.72
 app-max-width            = 200
 
 [battery]
-# Percent. low tints the battery bar; critical tints it urgent and is the
-# low-battery notification threshold (jimmy.battery).
+# Percent. On battery, the number turns amber at low and red at critical
+# (critical is also the low-battery notification threshold, jimmy.battery).
 low                      = 20
 critical                 = 10
-# The battery pill: wide and tall enough to hold the % inside.
-bar-width                = 52
-bar-height               = 22
-# Charging: one slow colour drift of the 1px outline, ms per full loop.
-shimmer-ms               = 7000
+# Amber: the accent mixed this far toward urgent, to read apart from the
+# plugged-in accent.
+low-mix                  = 0.45
 
 [clock]
 # Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.
@@ -112,6 +111,8 @@ close-scale              = 0.97
 [toast]
 # Toasts grow out of the right island, attached: extra gap below the island (0 = touching).
 gap                      = 0
+# Space between a toast's border and its content (was island.padding-x).
+padding-x                = 10
 
 [agents]
 # Usage records shown on the agents icon (ids in ~/.local/state/omarchy/agents/usage).

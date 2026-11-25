@@ -44,8 +44,8 @@ Item {
   // keeps exactly `pad` between border and content on every side whatever
   // glyph or message it carries. Messages grow with their text up to
   // `maxMessageWidth` and elide beyond it.
-  // Island padding, so a toast reads as part of the island it grows from.
-  readonly property int pad: Tokens.num(root.tokens, "island.padding-x", 10)
+  // Toast padding: its own token, so airier islands leave toasts as they are.
+  readonly property int pad: Tokens.num(root.tokens, "toast.padding-x", 10)
   readonly property int gap: Style.space(16)
   // A glyph next to a message reads airier than it measures: the icon outline
   // and the letterforms both fall away from their ink extremes, so the space

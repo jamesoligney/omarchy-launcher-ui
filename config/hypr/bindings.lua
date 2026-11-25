@@ -144,7 +144,7 @@ pcall(hl.define_submap, "bar", "reset", function()
     o.bind("code:" .. tostring(slot + 9), "Workspace " .. slot, o.workspaces.focus(slot))
   end
   o.bind("W", "Weather", "omarchy-shell shell toggle omarchy.weather")
-  o.bind("T", "Calendar", "omarchy-shell shell toggle omarchy.clock")
+  o.bind("C", "Calendar", "omarchy-shell shell toggle omarchy.clock")
   o.bind("B", "Battery and power", "omarchy-shell shell toggle omarchy.power")
   o.bind("A", "Agents", "omarchy-shell shell toggle omarchy.agents")
   o.bind("Q", "Quick toggles", "omarchy-shell jimmy.bar quick")

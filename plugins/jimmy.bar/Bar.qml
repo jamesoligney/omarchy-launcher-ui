@@ -53,9 +53,6 @@ Item {
   readonly property int appMaxWidth: num("island.app-max-width", 200)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
-  readonly property int batteryWidth: num("battery.bar-width", 52)
-  readonly property int batteryHeight: num("battery.bar-height", 22)
-  readonly property int shimmerMs: num("battery.shimmer-ms", 7000)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
   readonly property int fullscreenDebounce: num("fullscreen.debounce-ms", 50)
   readonly property string clockFormat: Tokens.str(tokens, "clock.format", "h:mm")
@@ -80,17 +77,11 @@ Item {
   readonly property int batteryPercent: battery && battery.isPresent ? Math.round(battery.percentage * 100) : -1
   readonly property bool charging: battery ? (battery.state === UPowerDeviceState.Charging
     || battery.state === UPowerDeviceState.PendingCharge) : false
-  // Charging: the battery pill's 1px outline drifts slowly between two accent
-  // shades, low contrast, one loop of battery.shimmer-ms; nothing pulses.
-  property color shimmerColor: Util.alpha(Commons.Color.accent, 0.35)
-  readonly property color shimmerLow: Util.alpha(Commons.Color.accent, 0.35)
-  readonly property color shimmerHigh: Util.alpha(Qt.lighter(Commons.Color.accent, 1.2), 0.75)
-  SequentialAnimation on shimmerColor {
-    running: root.charging
-    loops: Animation.Infinite
-    ColorAnimation { from: root.shimmerLow; to: root.shimmerHigh; duration: root.shimmerMs / 2; easing.type: Easing.InOutSine }
-    ColorAnimation { from: root.shimmerHigh; to: root.shimmerLow; duration: root.shimmerMs / 2; easing.type: Easing.InOutSine }
-  }
+  // Plugged in (charging, or held at its charge limit): the number turns accent.
+  readonly property bool pluggedIn: !UPower.onBattery
+  // Low on battery: amber, mixed from the theme's accent toward its urgent
+  // red (battery.low-mix), so it reads apart from the plugged-in accent.
+  readonly property color lowTone: Qt.tint(root.accent, Util.alpha(root.urgent, num("battery.low-mix", 0.45)))
 
   readonly property string appName: {
     var top = ToplevelManager.activeToplevel
@@ -210,20 +201,20 @@ Item {
     function refreshWeather(): void { if (root.weatherData && root.weatherData.refresh) root.weatherData.refresh() }
     function toggle(id: string): bool { return root.toggleBarWidget(id) }
     // Super+Ctrl+Q: the quick-toggles pop-out, from the keyboard.
-    function quick(): void { root.openQuick(!(quick.opened && quick.keyboard)) }
+    function quick(): void { if (root.quickOpen && root.quickKeyboard) root.closeQuick(); else root.openQuick(true) }
     // What the islands are showing, for checking from a terminal.
     function status(): string {
       return JSON.stringify({
         hosted: Object.keys(root.hosts),
         weather: { panel: !!root.weatherData, icon: root.weatherIcon, state: weatherStaleness.state, age: weatherStaleness.ageText,
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
-        battery: { percent: root.batteryPercent, charging: root.charging, shimmer: String(root.shimmerColor) },
+        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
         agents: { state: root.agentState, running: root.agentRunning,
           peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
         leader: root.leaderActive,
         silenced: root.silenced,
-        quick: { opened: quick.opened, keyboard: quick.keyboard, hoverTime: root.quickHoverTime, hoverCard: root.quickHoverCard },
+        quick: { open: root.quickOpen, keyboard: root.quickKeyboard, index: root.quickIndex, hovered: root.quickHovered },
         adopted: adopter.adoptedIds,
         lastAdopt: adopter.lastAttempt
       })
@@ -292,7 +283,6 @@ Item {
         if (root.activePopout && root.activePopout !== owner && typeof root.activePopout.close === "function")
           root.activePopout.close()
         root.activePopout = owner
-        quick.opened = false
         adopter.adopt(owner, id)
       },
       _releasePopout: function(owner) {
@@ -346,17 +336,26 @@ Item {
     textFormat: Text.PlainText
   }
 
-  // The leader letter for an element, shown only while the leader is active.
-  component Hint: Text {
-    visible: root.leaderActive
-    anchors.right: parent ? parent.right : undefined
-    anchors.top: parent ? parent.top : undefined
-    anchors.rightMargin: -6
-    anchors.topMargin: -2
-    text: ""
-    color: root.accent
-    font.family: root.fontFamily
-    font.pixelSize: 10
+  // The leader key for an element: a small translucent badge centred over
+  // the icon or number it belongs to, only while the leader is active.
+  component Hint: Rectangle {
+    property string text: ""
+    visible: root.leaderActive && text !== ""
+    anchors.centerIn: parent
+    z: 10
+    width: Math.max(height, hintText.implicitWidth + 8)
+    height: 15
+    radius: 4
+    color: Util.alpha(root.accent, 0.62)
+    Text {
+      id: hintText
+      anchors.centerIn: parent
+      text: parent.text
+      color: Commons.Color.background
+      font.family: root.fontFamily
+      font.pixelSize: 10
+      font.features: { "tnum": 1 }
+    }
   }
 
   component Light: Label {
@@ -373,121 +372,47 @@ Item {
     onClicked: root.toggleBarWidget(target)
   }
 
-  // ------------------------------------------------- quick toggles pop-out
-  // The stock hover pop-out by the time, in the new language: drops from the
-  // right island (PanelShell). Hover the time to open it; Super+Ctrl+Q opens it
-  // with keyboard focus (Up/Down, Enter, Esc). Items: the stock list minus the
-  // dropped ones (passwordless sudo, screen recording).
+  // ------------------------------------------------- quick toggles strip
+  // The stock pop-out, in the island language: hovering the time slides the
+  // icons out to its left, inside the right island. Icons only, grey when
+  // off, accent when on; a lit one stays in the bar until clicked off.
+  // Q (Super+Ctrl+Q, or Super+D then Q) opens the same strip with focus:
+  // Left/Right, Enter, Esc. The calendar drops below the island, so the two
+  // never meet. Items: the stock list minus passwordless sudo and screen
+  // recording (dropped in the refined brief).
   readonly property var quickItems: [
-    { key: "stay", icon: "\udb80\udd76", label: "Stay awake", on: root.stayAwake },
-    { key: "reminder", icon: "\udb80\udc20", label: "Set reminder", on: false },
-    { key: "night", icon: "\udb81\udd94", label: "Night light", on: false },
-    { key: "silence", icon: "\udb80\udc9b", label: "Silence notifications", on: root.silenced }
+    { key: "reminder", icon: "\udb80\udc20", on: false },
+    { key: "night", icon: "\udb81\udd94", on: false },
+    { key: "silence", icon: "\udb80\udc9b", on: root.silenced },
+    { key: "stay", icon: "\udb80\udd76", on: root.stayAwake }
   ]
+  property bool quickOpen: false
+  property bool quickKeyboard: false
+  property bool quickHovered: false
   property int quickIndex: 0
-  property bool quickHoverTime: false
-  property bool quickHoverCard: false
 
   function runQuick(key) {
     if (key === "stay") root.toggleStayAwake()
     else if (key === "silence") root.toggleSilence()
     else {
-      quick.opened = false
+      root.closeQuick()
       if (key === "reminder") Quickshell.execDetached(["omarchy-shell", "shell", "summon", "jimmy.reminders", "{}"])
       else if (key === "night") root.toggleBarWidget("io.github.cwilliams5.locus")
     }
   }
   function openQuick(keyboard) {
-    if (root.activePopout && typeof root.activePopout.close === "function") root.activePopout.close()
-    quick.keyboard = keyboard
-    root.quickIndex = 0
-    quick.opened = true
-    if (keyboard) Qt.callLater(function() { quickKeys.forceActiveFocus() })
+    root.quickKeyboard = keyboard
+    root.quickIndex = root.quickItems.length - 1
+    root.quickOpen = true
   }
-  function hoverQuick(inside) { root.quickHoverTime = inside; quickHoverTimer.restart() }
+  function closeQuick() { root.quickOpen = false; root.quickKeyboard = false }
+  function hoverQuick(inside) { root.quickHovered = inside; quickHoverTimer.restart() }
   Timer {
     id: quickHoverTimer
-    interval: quick.opened ? 300 : 180
+    interval: root.quickOpen ? 300 : 180
     onTriggered: {
-      var want = root.quickHoverTime || root.quickHoverCard
-      if (want && !quick.opened) root.openQuick(false)
-      else if (!want && quick.opened && !quick.keyboard) quick.opened = false
-    }
-  }
-
-  PanelShell {
-    id: quick
-    screen: Quickshell.screens.length ? Quickshell.screens[0] : null
-    anchor: "right"
-    contentWidth: 230
-    contentHeight: quickColumn.implicitHeight
-    onDismissed: quick.opened = false
-    // The whole card counts as the hover zone, padding included.
-    onHoveredChanged: { root.quickHoverCard = hovered; quickHoverTimer.restart() }
-
-    Item {
-      id: quickKeys
-      anchors.fill: parent
-      focus: true
-      Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Escape) quick.opened = false
-        else if (event.key === Qt.Key_Down) root.quickIndex = (root.quickIndex + 1) % root.quickItems.length
-        else if (event.key === Qt.Key_Up) root.quickIndex = (root.quickIndex + root.quickItems.length - 1) % root.quickItems.length
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.runQuick(root.quickItems[root.quickIndex].key)
-        else return
-        event.accepted = true
-      }
-      Column {
-        id: quickColumn
-        width: parent.width
-        spacing: 2
-        Repeater {
-          model: root.quickItems
-          Rectangle {
-            required property var modelData
-            required property int index
-            width: quickColumn.width
-            height: 34
-            radius: root.islandRadius - 3
-            readonly property bool current: quick.keyboard && index === root.quickIndex
-            color: current || rowMouse.containsMouse ? Util.alpha(root.accent, 0.16) : "transparent"
-            Row {
-              anchors.verticalCenter: parent.verticalCenter
-              x: 8
-              spacing: 10
-              Text {
-                text: modelData.icon
-                color: modelData.on ? root.accent : root.quiet
-                font.family: root.iconFamily
-                font.pixelSize: root.fontSize
-              }
-              Text {
-                text: modelData.label
-                color: modelData.on ? root.ink : root.quiet
-                font.family: root.fontFamily
-                font.pixelSize: root.fontSize - 2
-              }
-            }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.right: parent.right
-              anchors.rightMargin: 8
-              visible: modelData.key === "stay" || modelData.key === "silence"
-              text: modelData.on ? "On" : "Off"
-              color: modelData.on ? root.accent : root.quiet
-              font.family: root.fontFamily
-              font.pixelSize: root.fontSize - 4
-            }
-            MouseArea {
-              id: rowMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.runQuick(modelData.key)
-            }
-          }
-        }
-      }
+      if (root.quickHovered && !root.quickOpen) root.openQuick(false)
+      else if (!root.quickHovered && root.quickOpen && !root.quickKeyboard) root.closeQuick()
     }
   }
 
@@ -550,6 +475,23 @@ Item {
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "jimmy-bar"
+        WlrLayershell.keyboardFocus: root.quickOpen && root.quickKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+        // Keys for the strip while it has focus.
+        Item {
+          id: quickKeys
+          focus: root.quickOpen && root.quickKeyboard
+          onFocusChanged: if (focus) forceActiveFocus()
+          Keys.onPressed: function(event) {
+            var n = root.quickItems.length
+            if (event.key === Qt.Key_Escape) root.closeQuick()
+            else if (event.key === Qt.Key_Left) root.quickIndex = (root.quickIndex + n - 1) % n
+            else if (event.key === Qt.Key_Right) root.quickIndex = (root.quickIndex + 1) % n
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.runQuick(root.quickItems[root.quickIndex].key)
+            else return
+            event.accepted = true
+          }
+        }
         WlrLayershell.layer: WlrLayer.Top
 
         readonly property var workspaces: {
@@ -592,14 +534,13 @@ Item {
                 height: root.islandHeight - 8
                 radius: root.islandRadius - 3
                 color: modelData.active ? Util.alpha(root.accent, 0.22) : "transparent"
-                border.width: root.leaderActive ? 1 : 0
-                border.color: Util.alpha(root.accent, 0.6)
                 Label {
                   id: slotText
                   anchors.centerIn: parent
                   text: String(parent.modelData.slot)
                   color: parent.modelData.active ? root.accent : root.quiet
                 }
+                Hint { text: parent.modelData.slot <= 9 ? String(parent.modelData.slot) : "" }
                 MouseArea {
                   anchors.fill: parent
                   cursorShape: Qt.PointingHandCursor
@@ -623,33 +564,75 @@ Item {
           centerX: window.ears.rightCenter
           maxWidth: window.ears.maxIslandWidth
 
-          // Stay awake, while on: lives left of the time; click turns it off.
-          Light {
-            on: root.stayAwake
-            text: "\udb80\udd76"
-            color: root.accent
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.toggleStayAwake()
+          // The quick-toggles strip and the time: one hover zone. The strip
+          // slides out to the left of the time; lit items stay in the bar.
+          Item {
+            id: timeZone
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: timeRow.implicitWidth
+            implicitHeight: root.islandHeight
+            HoverHandler { onHoveredChanged: root.hoverQuick(hovered) }
+            Row {
+              id: timeRow
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: root.islandSpacing
+              Item {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: stripRow.visibleChildren.length > 0
+                implicitWidth: stripRow.implicitWidth
+                implicitHeight: root.islandHeight
+                Row {
+                  id: stripRow
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: root.islandSpacing
+                  Repeater {
+                    model: root.quickItems
+                    Item {
+                      required property var modelData
+                      required property int index
+                      readonly property bool current: root.quickKeyboard && index === root.quickIndex
+                      visible: root.quickOpen || root.leaderActive || modelData.on
+                      anchors.verticalCenter: parent.verticalCenter
+                      implicitWidth: icon.implicitWidth
+                      implicitHeight: root.islandHeight - 8
+                      Rectangle {
+                        visible: parent.current
+                        anchors.centerIn: parent
+                        width: icon.implicitWidth + 10
+                        height: parent.height
+                        radius: root.islandRadius - 3
+                        color: "transparent"
+                        border.width: 1
+                        border.color: root.accent
+                      }
+                      Label {
+                        id: icon
+                        anchors.centerIn: parent
+                        text: modelData.icon
+                        font.family: root.iconFamily
+                        color: modelData.on ? root.accent : root.quiet
+                        opacity: modelData.on ? 1 : 0.45
+                      }
+                      MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.runQuick(modelData.key)
+                      }
+                      // Q sits on stay awake: the strip's anchor, nearest the time.
+                      Hint { text: index === root.quickItems.length - 1 ? "Q" : "" }
+                    }
+                  }
+                }
+              }
+              // Time, nearest the notch. Click: calendar.
+              Label {
+                height: root.islandHeight
+                verticalAlignment: Text.AlignVCenter
+                text: Qt.formatTime(clock.date, root.clockFormat)
+                Tap { target: "omarchy.clock" }
+                Hint { text: "C" }
+              }
             }
-          }
-
-          // Time, nearest the notch. Click: calendar. Hover: quick toggles.
-          Label {
-            height: root.islandHeight
-            verticalAlignment: Text.AlignVCenter
-            text: Qt.formatTime(clock.date, root.clockFormat)
-            // The hover zone runs the full island height, so it ends exactly
-            // where the attached pop-out card begins: no dead band between.
-            Tap {
-              target: "omarchy.clock"
-              anchors.topMargin: -root.islandGap
-              anchors.bottomMargin: -root.islandGap
-              hoverEnabled: true
-              onContainsMouseChanged: root.hoverQuick(containsMouse)
-            }
-            Hint { text: "T Q" }
           }
 
           // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
@@ -677,38 +660,15 @@ Item {
             Hint { text: "W" }
           }
 
-          // Battery: fixed-width pill, % inside, fill = charge.
-          Item {
-            id: batteryPill
+          // Battery: the number only. Accent while plugged in, neutral on
+          // battery, amber at battery.low and red at battery.critical.
+          Label {
             visible: root.batteryPercent >= 0
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.batteryWidth
-            height: root.batteryHeight
-            readonly property color tone: root.batteryPercent <= root.batteryCritical ? root.urgent
-              : (root.batteryPercent <= root.batteryLow ? root.accent : root.ink)
-            Rectangle {
-              anchors.fill: parent
-              radius: height / 2
-              color: "transparent"
-              border.width: 1
-              border.color: root.charging ? root.shimmerColor : Util.alpha(batteryPill.tone, 0.55)
-            }
-            Rectangle {
-              x: 2; y: 2
-              height: parent.height - 4
-              width: Math.max(height, (parent.width - 4) * Math.max(0, root.batteryPercent) / 100)
-              radius: height / 2
-              color: Util.alpha(batteryPill.tone, root.batteryPercent <= root.batteryLow ? 0.55 : 0.28)
-              Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-            }
-            Text {
-              anchors.centerIn: parent
-              text: Math.max(0, root.batteryPercent) + "%"
-              color: root.ink
-              font.family: root.fontFamily
-              font.pixelSize: Math.round(root.batteryHeight * 0.6)
-              font.features: { "tnum": 1 }
-            }
+            text: Math.max(0, root.batteryPercent) + "%"
+            color: root.pluggedIn ? root.accent
+              : root.batteryPercent <= root.batteryCritical ? root.urgent
+              : root.batteryPercent <= root.batteryLow ? root.lowTone
+              : root.quiet
             Tap { target: "omarchy.power" }
             Hint { text: "B" }
           }
