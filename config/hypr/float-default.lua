@@ -57,24 +57,51 @@ local function has_tag(window, name)
   return false
 end
 
--- On a workspace in Omarchy's floating mode (Super+L) the mode's own open
--- rule is registered at runtime, after this one, so it would win (its stock
--- size and a cascade). The default wins there too: a window that rule opened
--- (it carries the rule's tag) is set to the default size, centred.
+-- Which windows keep their own size. Hyprland's Lua cannot ask a window
+-- whether it is a dialog (no modal or parent field, and window queries take
+-- no modal filter), so a window is classed as it opens, when the rules have
+-- just fired: one that opened floating without the default rule or Omarchy's
+-- floating-window tag floated on its own account (a dialog or popup Hyprland
+-- floated, a modal, an app with its own float rule) and is tagged
+-- SELF_FLOATED, for good. Every other window is a normal app window,
+-- including ones open since before this existed. Apps with their own stock
+-- float size are also recognised by o.floating_apps, for older windows.
+local SELF_FLOATED = "self-floated"
+local FLOATING_WS = "omarchy-floating-workspace"
+
+local function own_float_size()
+  local set = {}
+  for key, list in pairs({ class = o.floating_apps.class, title = o.floating_apps.title }) do
+    for _, pattern in ipairs(list or {}) do
+      local ok, found = pcall(hl.get_windows, { [key] = pattern })
+      if ok then for _, w in ipairs(found) do set[w.address] = true end end
+    end
+  end
+  return set
+end
+
+local function keeps_own_size(window, own)
+  return (window.fullscreen or 0) ~= 0 or has_tag(window, SELF_FLOATED) or own[window.address]
+end
+
 hl.on("window.open", function(window)
-  if has_tag(window, "omarchy-mode-opened") then place(window) end
+  -- Omarchy's floating mode opens windows with a rule of its own, registered
+  -- at runtime after this file's, so it would win (its stock size and a
+  -- cascade). The default wins there too.
+  if has_tag(window, "omarchy-mode-opened") then
+    place(window)
+  elseif window.floating and not has_tag(window, TAG) and not has_tag(window, "floating-window") then
+    hl.dispatch(hl.dsp.window.tag({ tag = "+" .. SELF_FLOATED, window = "address:" .. window.address }))
+  end
 end)
 
--- Switching a workspace to floating (Stage 21) resets its windows to the
--- default size, centred, every time: Super+L / the layout toggle (both
+-- A workspace switching to floating resets its windows to the default size,
+-- centred, every time (Stages 21-22): Super+L / the layout toggle (both
 -- o.workspace_mode) and a changed default applied on reload (the module's
 -- apply). Omarchy marks every window on a floating workspace with a tag that
 -- survives reloads, so the windows that just gained it are the ones that
 -- just switched; a reload that only restores saved modes resets nothing.
--- Reset: windows the mode just floated from tiled, and windows the default
--- sized; dialogs, apps that size themselves and fullscreen windows are left.
-local FLOATING_WS = "omarchy-floating-workspace"
-
+-- Every normal app window on the workspace is reset, whatever floated it.
 local function on_floating()
   local seen = {}
   for _, window in ipairs(hl.get_windows({ tag = FLOATING_WS })) do seen[window.address] = true end
@@ -82,11 +109,9 @@ local function on_floating()
 end
 
 local function reset_switched(before)
+  local own = own_float_size()
   for _, window in ipairs(hl.get_windows({ tag = FLOATING_WS })) do
-    if not before[window.address] and (window.fullscreen or 0) == 0
-        and (has_tag(window, TAG) or has_tag(window, "omarchy-mode-floated")) then
-      place(window)
-    end
+    if not before[window.address] and not keeps_own_size(window, own) then place(window) end
   end
 end
 
@@ -103,6 +128,26 @@ end
 local modes = require("default.hypr.workspace-modes")
 o.workspace_mode = resetting(o.workspace_mode)
 modes.apply = resetting(modes.apply)
+
+-- The mode also floats a tiled window that arrives on a floating workspace,
+-- by being moved there or by leaving fullscreen, and places it the stock way
+-- one tick later. The default wins there too: a little after the mode, a
+-- window that came in tiled and is now floating on a floating workspace is
+-- set to the default.
+local function after_mode(window)
+  local was_floating, address = window.floating, window.address
+  hl.timer(function()
+    local now = hl.get_windows({ tag = FLOATING_WS })
+    for _, w in ipairs(now) do
+      if w.address == address and w.floating and not was_floating
+          and not keeps_own_size(w, own_float_size()) then
+        place(w)
+      end
+    end
+  end, { type = "oneshot", timeout = 30 })
+end
+hl.on("window.move_to_workspace", function(window) after_mode(window) end)
+hl.on("window.fullscreen", function(window) after_mode(window) end)
 
 -- Super+T (bindings.lua): floating a window gives it the default size,
 -- centred, the first time; after that it returns to the floating size and
