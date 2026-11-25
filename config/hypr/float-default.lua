@@ -1,7 +1,8 @@
 -- Floating default (bar brief Q8, Stage 18): a window that floats starts at
 -- this size, centred on the monitor's usable area (below the bar's reserve).
--- Change the size here, in one place.
-o.float_default = { width = 1100, height = 700 }
+-- Change the size here, in one place. 1100x619 is measured from the Zen
+-- window James sized by hand (Stage 20); centred, it lands at (314, 273).
+o.float_default = { width = 1100, height = 619 }
 
 local size = { o.float_default.width, o.float_default.height }
 
