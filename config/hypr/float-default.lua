@@ -84,15 +84,36 @@ local function keeps_own_size(window, own)
   return (window.fullscreen or 0) ~= 0 or has_tag(window, SELF_FLOATED) or own[window.address]
 end
 
-hl.on("window.open", function(window)
-  -- Omarchy's floating mode opens windows with a rule of its own, registered
-  -- at runtime after this file's, so it would win (its stock size and a
-  -- cascade). The default wins there too.
-  if has_tag(window, "omarchy-mode-opened") then
-    place(window)
-  elseif window.floating and not has_tag(window, TAG) and not has_tag(window, "floating-window") then
-    hl.dispatch(hl.dsp.window.tag({ tag = "+" .. SELF_FLOATED, window = "address:" .. window.address }))
+-- Every new app window ends at the default, however it mapped. The rules
+-- above float it as it maps, but not every window lets them: one that asks
+-- to open maximized (Helium remembers its last window as maximized) maps
+-- tiled although Omarchy suppresses the maximize itself, and on a floating
+-- workspace Omarchy's mode then floats it the stock way (its size, a
+-- cascade), after this handler. So the window is classed at once, and a
+-- moment later, once the mode has run, a normal app window on a regular
+-- workspace is floated if it is still tiled and set to the default.
+local function window_at(address)
+  for _, w in ipairs(hl.get_windows()) do
+    if w.address == address then return w end
   end
+end
+
+hl.on("window.open", function(window)
+  if window.floating and not has_tag(window, TAG) and not has_tag(window, "floating-window")
+      and not has_tag(window, "omarchy-mode-opened") then
+    hl.dispatch(hl.dsp.window.tag({ tag = "+" .. SELF_FLOATED, window = "address:" .. window.address }))
+    return
+  end
+  local address = window.address
+  hl.timer(function()
+    local w = window_at(address)
+    local id = w and w.workspace and tonumber(w.workspace.id)
+    if not id or id < 1 or keeps_own_size(w, own_float_size()) then return end
+    if not w.floating then
+      hl.dispatch(hl.dsp.window.float({ action = "on", window = "address:" .. address }))
+    end
+    place(w)
+  end, { type = "oneshot", timeout = 30 })
 end)
 
 -- A workspace switching to floating resets its windows to the default size,
