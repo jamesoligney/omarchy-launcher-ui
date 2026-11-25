@@ -44,7 +44,8 @@ Item {
   // keeps exactly `pad` between border and content on every side whatever
   // glyph or message it carries. Messages grow with their text up to
   // `maxMessageWidth` and elide beyond it.
-  readonly property int pad: Style.space(16)
+  // Island padding, so a toast reads as part of the island it grows from.
+  readonly property int pad: Tokens.num(root.tokens, "island.padding-x", 10)
   readonly property int gap: Style.space(16)
   // A glyph next to a message reads airier than it measures: the icon outline
   // and the letterforms both fall away from their ink extremes, so the space
@@ -108,7 +109,7 @@ Item {
   TextMetrics {
     id: messageMetrics
     font.family: Tokens.str(root.tokens, "ui.font", Style.font.family)
-    font.bold: true
+    font.weight: Font.Medium
     font.pixelSize: Style.font.title
     text: root.message
   }
@@ -162,10 +163,11 @@ Item {
       width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
       height: card.borderTop + root.pad + Style.font.displayLarge + root.pad + card.borderBottom
       x: Math.round(ears.rightCenter - width / 2)
-      y: Tokens.num(root.tokens, "bar.height", 44) + Tokens.num(root.tokens, "toast.gap", 8)
+      // Attached: the toast's top edge is the island's bottom edge.
+      y: Tokens.num(root.tokens, "bar.height", 44) - Tokens.num(root.tokens, "island.gap", 3) + Tokens.num(root.tokens, "toast.gap", 0)
       color: Util.alpha(Commons.Color.background, Tokens.num(root.tokens, "launcher.panel-background-alpha", 0.70))
       borderSpec: Border.surfaceSpec("launcher", "panel-border", Util.alpha(Commons.Color.accent, Tokens.num(root.tokens, "launcher.panel-border-alpha", 0.16)), 1)
-      radius: Tokens.num(root.tokens, "launcher.panel-radius", 16)
+      radius: Tokens.num(root.tokens, "island.radius", 9)
       // Grows out of the island above it.
       transform: Scale {
         origin.x: card.width / 2

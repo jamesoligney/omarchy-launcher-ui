@@ -126,3 +126,10 @@ o.rebind("CTRL + XF86MonBrightnessUp", "Keyboard brightness up", "omarchy-kbd-ba
 o.rebind("XF86KbdBrightnessDown", "Keyboard brightness down", "omarchy-kbd-backlight down", { locked = true, repeating = true })
 o.rebind("XF86KbdBrightnessUp", "Keyboard brightness up", "omarchy-kbd-backlight up", { locked = true, repeating = true })
 -- kbd-backlight: end
+
+-- bar-quick: begin
+-- Quick toggles (stay awake, set reminder, night light, silence) from the
+-- right island of jimmy.bar, keyboard path: Up/Down, Enter, Esc. Hovering the
+-- time opens the same pop-out.
+o.bind("SUPER + CTRL + Q", "Quick toggles", "omarchy-shell jimmy.bar quick")
+-- bar-quick: end

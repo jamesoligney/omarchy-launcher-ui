@@ -89,7 +89,11 @@ Item {
   // First-party services open to bar plugins.
   readonly property var idleService: shell ? shell.firstPartyServiceFor("omarchy.idle") : null
   readonly property var remoteService: shell ? shell.firstPartyServiceFor("omarchy.remote-session") : null
+  readonly property var notificationService: shell ? shell.firstPartyServiceFor("omarchy.notifications") : null
   readonly property bool stayAwake: !!idleService && idleService.stayAwake === true
+  readonly property bool silenced: !!notificationService && notificationService.doNotDisturb === true
+  function toggleStayAwake() { if (idleService) idleService.setIdleEnabled(root.stayAwake) }
+  function toggleSilence() { if (notificationService) notificationService.setDoNotDisturb(!root.silenced) }
   readonly property bool remoteActive: !!remoteService && remoteService.active === true
   readonly property bool micInUse: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].inUse === true
   property bool recording: false
@@ -151,6 +155,31 @@ Item {
     return peak
   }
   readonly property bool agentNearLimit: agentPeak >= nearLimit
+
+  // Which Claude account the single claude.json usage record belongs to: the
+  // active one in accounts/claude.json. The other account has no record of
+  // its own (open investigation #13), so its capsule shows "no data".
+  property string claudeActive: "main"
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/agents/accounts/claude.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: { try { root.claudeActive = String(JSON.parse(text()).active || "main") } catch (e) {} }
+  }
+  function peakOf(record) {
+    var peak = -1, limits = record && record.limits
+    for (var i = 0; limits && i < limits.length; i++) peak = Math.max(peak, Number(limits[i].percent) || 0)
+    return peak
+  }
+  // One capsule per model, fixed order. peak = highest limit used (0-1),
+  // -1 = no data. Colour = state: over limit, near limit, or calm.
+  readonly property var agentModels: [
+    { id: "claude-main", label: "Claude Personal", peak: claudeActive === "main" ? peakOf(agentRecords["claude"]) : -1 },
+    { id: "claude-teams", label: "Claude Teams", peak: claudeActive === "teams" ? peakOf(agentRecords["claude"]) : -1 },
+    { id: "opencode", label: "OpenCode", peak: peakOf(agentRecords["opencode"]) },
+    { id: "grok", label: "Grok", peak: peakOf(agentRecords["grok"]) }
+  ]
   readonly property bool agentRunning: {
     var tops = ToplevelManager.toplevels.values
     for (var i = 0; i < tops.length; i++) if (tops[i].appId === "org.omarchy.agent") return true
@@ -176,6 +205,8 @@ Item {
     target: "jimmy.bar"
     function refreshWeather(): void { if (root.weatherData && root.weatherData.refresh) root.weatherData.refresh() }
     function toggle(id: string): bool { return root.toggleBarWidget(id) }
+    // Super+Ctrl+Q: the quick-toggles pop-out, from the keyboard.
+    function quick(): void { root.openQuick(!(quick.opened && quick.keyboard)) }
     // What the islands are showing, for checking from a terminal.
     function status(): string {
       return JSON.stringify({
@@ -184,16 +215,23 @@ Item {
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
         battery: { percent: root.batteryPercent, charging: root.charging },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
-        agents: { peak: root.agentPeak, nearLimit: root.agentNearLimit, running: root.agentRunning, records: Object.keys(root.agentRecords) }
+        agents: { models: root.agentModels, running: root.agentRunning, claudeActive: root.claudeActive },
+        silenced: root.silenced,
+        quick: { opened: quick.opened, keyboard: quick.keyboard },
+        adopted: adopter.adoptedIds,
+        lastAdopt: adopter.lastAttempt
       })
     }
   }
 
   // --------------------------------------------------- hosted panel widgets
   readonly property var hostIds: ["omarchy.audio", "omarchy.bluetooth", "omarchy.network", "omarchy.power",
-    "omarchy.monitor", "omarchy.clock", "omarchy.weather", "omarchy.agents", "omarchy.microphone"]
+    "omarchy.monitor", "omarchy.clock", "omarchy.weather", "omarchy.agents", "omarchy.microphone",
+    "io.github.cwilliams5.locus"]
   property var hosts: ({})
   property var activePopout: null
+  // Hosted panels open in the shared panel language (PanelShell family).
+  PanelAdopter { id: adopter }
 
   function entrySettings(id) {
     var layout = barConfig && barConfig.layout ? barConfig.layout : {}
@@ -248,8 +286,13 @@ Item {
         if (root.activePopout && root.activePopout !== owner && typeof root.activePopout.close === "function")
           root.activePopout.close()
         root.activePopout = owner
+        quick.opened = false
+        adopter.adopt(owner, id)
       },
-      _releasePopout: function(owner) { if (root.activePopout === owner) root.activePopout = null },
+      _releasePopout: function(owner) {
+        adopter.release(owner)
+        if (root.activePopout === owner) root.activePopout = null
+      },
       _popoutCardFor: function(owner) { return null },
       _switchPanelFrom: function(owner, direction) { return false },
       _targetBelongsToWindow: function(target, window) { return false },
@@ -309,6 +352,128 @@ Item {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
     onClicked: root.toggleBarWidget(target)
+  }
+
+  // ------------------------------------------------- quick toggles pop-out
+  // The stock hover pop-out by the time, in the new language: drops from the
+  // right island (PanelShell). Hover the time to open it; Super+Ctrl+Q opens it
+  // with keyboard focus (Up/Down, Enter, Esc). Items: the stock list minus the
+  // dropped ones (passwordless sudo, screen recording).
+  readonly property var quickItems: [
+    { key: "stay", icon: "\udb80\udd76", label: "Stay awake", on: root.stayAwake },
+    { key: "reminder", icon: "\udb80\udc20", label: "Set reminder", on: false },
+    { key: "night", icon: "\udb81\udd94", label: "Night light", on: false },
+    { key: "silence", icon: "\udb80\udc9b", label: "Silence notifications", on: root.silenced }
+  ]
+  property int quickIndex: 0
+  property bool quickHoverTime: false
+  property bool quickHoverCard: false
+
+  function runQuick(key) {
+    if (key === "stay") root.toggleStayAwake()
+    else if (key === "silence") root.toggleSilence()
+    else {
+      quick.opened = false
+      if (key === "reminder") Quickshell.execDetached(["omarchy-shell", "shell", "summon", "jimmy.reminders", "{}"])
+      else if (key === "night") root.toggleBarWidget("io.github.cwilliams5.locus")
+    }
+  }
+  function openQuick(keyboard) {
+    if (root.activePopout && typeof root.activePopout.close === "function") root.activePopout.close()
+    quick.keyboard = keyboard
+    root.quickIndex = 0
+    quick.opened = true
+    if (keyboard) Qt.callLater(function() { quickKeys.forceActiveFocus() })
+  }
+  function hoverQuick(inside) { root.quickHoverTime = inside; quickHoverTimer.restart() }
+  Timer {
+    id: quickHoverTimer
+    interval: quick.opened ? 300 : 180
+    onTriggered: {
+      var want = root.quickHoverTime || root.quickHoverCard
+      if (want && !quick.opened) root.openQuick(false)
+      else if (!want && quick.opened && !quick.keyboard) quick.opened = false
+    }
+  }
+
+  PanelShell {
+    id: quick
+    screen: Quickshell.screens.length ? Quickshell.screens[0] : null
+    anchor: "right"
+    contentWidth: 230
+    contentHeight: quickColumn.implicitHeight
+    onDismissed: quick.opened = false
+
+    Item {
+      id: quickKeys
+      anchors.fill: parent
+      focus: true
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) quick.opened = false
+        else if (event.key === Qt.Key_Down) root.quickIndex = (root.quickIndex + 1) % root.quickItems.length
+        else if (event.key === Qt.Key_Up) root.quickIndex = (root.quickIndex + root.quickItems.length - 1) % root.quickItems.length
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.runQuick(root.quickItems[root.quickIndex].key)
+        else return
+        event.accepted = true
+      }
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onContainsMouseChanged: { root.quickHoverCard = containsMouse; quickHoverTimer.restart() }
+      }
+      Column {
+        id: quickColumn
+        width: parent.width
+        spacing: 2
+        Repeater {
+          model: root.quickItems
+          Rectangle {
+            required property var modelData
+            required property int index
+            width: quickColumn.width
+            height: 34
+            radius: root.islandRadius - 3
+            readonly property bool current: quick.keyboard && index === root.quickIndex
+            color: current || rowMouse.containsMouse ? Util.alpha(root.accent, 0.16) : "transparent"
+            Row {
+              anchors.verticalCenter: parent.verticalCenter
+              x: 8
+              spacing: 10
+              Text {
+                text: modelData.icon
+                color: modelData.on ? root.accent : root.quiet
+                font.family: root.iconFamily
+                font.pixelSize: root.fontSize
+              }
+              Text {
+                text: modelData.label
+                color: modelData.on ? root.ink : root.quiet
+                font.family: root.fontFamily
+                font.pixelSize: root.fontSize - 2
+              }
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.right: parent.right
+              anchors.rightMargin: 8
+              visible: modelData.key === "stay" || modelData.key === "silence"
+              text: modelData.on ? "On" : "Off"
+              color: modelData.on ? root.accent : root.quiet
+              font.family: root.fontFamily
+              font.pixelSize: root.fontSize - 4
+            }
+            MouseArea {
+              id: rowMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.runQuick(modelData.key)
+            }
+          }
+        }
+      }
+    }
   }
 
   // ------------------------------------------------------------- windows
@@ -415,7 +580,6 @@ Item {
                   anchors.centerIn: parent
                   text: String(parent.modelData.slot)
                   color: parent.modelData.active ? root.accent : root.quiet
-                  font.bold: parent.modelData.active
                 }
                 MouseArea {
                   anchors.fill: parent
@@ -432,7 +596,6 @@ Item {
             elide: Text.ElideRight
             text: root.appName
             color: root.ink
-            font.bold: true
           }
         }
 
@@ -441,10 +604,26 @@ Item {
           centerX: window.ears.rightCenter
           maxWidth: window.ears.maxIslandWidth
 
-          // Time, nearest the notch. Click: calendar.
+          // Stay awake, while on: lives left of the time; click turns it off.
+          Light {
+            on: root.stayAwake
+            text: "\udb80\udd76"
+            color: root.accent
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleStayAwake()
+            }
+          }
+
+          // Time, nearest the notch. Click: calendar. Hover: quick toggles.
           Label {
             text: Qt.formatTime(clock.date, root.clockFormat)
-            Tap { target: "omarchy.clock" }
+            Tap {
+              target: "omarchy.clock"
+              hoverEnabled: true
+              onContainsMouseChanged: root.hoverQuick(containsMouse)
+            }
           }
 
           // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
@@ -494,21 +673,22 @@ Item {
               radius: height / 2
               color: Util.alpha(batteryPill.tone, root.batteryPercent <= root.batteryLow ? 0.55 : 0.28)
               Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-              // Charging: a soft pulse at the fill's leading edge, one loop.
-              Rectangle {
-                visible: root.charging
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(parent.width, parent.height)
-                height: parent.height
-                radius: height / 2
-                color: Util.alpha(root.ink, 0.9)
-                SequentialAnimation on opacity {
-                  running: root.charging && !screenScope.hidden
-                  loops: Animation.Infinite
-                  NumberAnimation { from: 0.0; to: 0.45; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
-                  NumberAnimation { from: 0.45; to: 0.0; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
-                }
+            }
+            // Charging: the outline pulses in the system accent, one slow
+            // loop; the pill and the number stay calm.
+            Rectangle {
+              visible: root.charging
+              anchors.fill: parent
+              anchors.margins: -2
+              radius: height / 2
+              color: "transparent"
+              border.width: 2
+              border.color: root.accent
+              SequentialAnimation on opacity {
+                running: root.charging && !screenScope.hidden
+                loops: Animation.Infinite
+                NumberAnimation { from: 0.25; to: 1.0; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 1.0; to: 0.25; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
               }
             }
             Text {
@@ -517,7 +697,6 @@ Item {
               color: root.ink
               font.family: root.fontFamily
               font.pixelSize: Math.round(root.batteryHeight * 0.6)
-              font.bold: true
               font.features: { "tnum": 1 }
             }
             Tap { target: "omarchy.power" }
@@ -525,31 +704,57 @@ Item {
 
           // Contextual lights: never hidden while on. Mic is primary and sits
           // rightmost; the others stack to its left.
-          Light { on: root.stayAwake; text: "󰅶"; color: root.accent }
           Light { on: root.remoteActive; text: "󰢹"; color: root.urgent }
           Light { on: root.recording; text: "󰻂"; color: root.urgent }
           Light { on: root.micInUse; text: "󰍬"; color: root.urgent }
 
-          // Agents: quiet until something is worth seeing. Dot: red = a
-          // tracked plan is near its limit. Click: the agents panel.
+          // Agents: one slim capsule per model (Claude Personal, Claude Teams,
+          // OpenCode, Grok). Fill = highest limit used; colour = state (red
+          // over limit, accent near limit, calm otherwise); a dim empty
+          // outline = no data. Click: the agents panel, per-model detail.
           Item {
             anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: agentGlyph.implicitWidth
-            implicitHeight: agentGlyph.implicitHeight
+            implicitWidth: agentRow.implicitWidth
+            implicitHeight: root.islandHeight
+          Row {
+            id: agentRow
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
             Label {
-              id: agentGlyph
-              anchors.verticalCenter: undefined
+              text: "\udb81\udea9"
               font.family: root.iconFamily
-              text: "󰚩"
-              opacity: root.agentRunning || root.agentNearLimit ? 1 : 0.6
+              opacity: root.agentRunning ? 1 : 0.6
             }
-            Rectangle {
-              visible: root.agentNearLimit
-              width: 6; height: 6; radius: 3
-              color: root.urgent
-              anchors.right: parent.right
-              anchors.top: parent.top
+            Repeater {
+              model: root.agentModels
+              Item {
+                required property var modelData
+                anchors.verticalCenter: parent.verticalCenter
+                width: 6
+                height: Math.round(root.islandHeight * 0.5)
+                readonly property real peak: modelData.peak
+                readonly property color tone: peak >= 1 ? root.urgent : (peak >= root.nearLimit ? root.accent : root.ink)
+                opacity: peak < 0 ? 0.35 : 1
+                Rectangle {
+                  anchors.fill: parent
+                  radius: width / 2
+                  color: "transparent"
+                  border.width: 1
+                  border.color: Util.alpha(parent.tone, 0.55)
+                }
+                Rectangle {
+                  visible: parent.peak > 0
+                  anchors.bottom: parent.bottom
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  width: parent.width
+                  height: Math.max(width, parent.height * Math.min(1, parent.peak))
+                  radius: width / 2
+                  color: Util.alpha(parent.tone, parent.peak >= root.nearLimit ? 0.85 : 0.45)
+                  Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                }
+              }
             }
+          }
             Tap { target: "omarchy.agents" }
           }
         }

@@ -5,6 +5,8 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "../jimmy.shared"
+import "../jimmy.shared/Tokens.js" as Tokens
+import "../jimmy.shared/BarGeometry.js" as BarGeometry
 import "ReminderFlowModel.js" as ReminderFlowModel
 
 Item {
@@ -31,7 +33,7 @@ Item {
   property string step: "minutes"
   property string minutes: ""
   property string filterText: ""
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Tokens.str(Commons.Color.shellValues, "ui.font", Style.font.menuFamily)
 
   property color background: Commons.Color.menu.background
   property color foreground: Commons.Color.menu.text
@@ -128,15 +130,20 @@ Item {
       id: card
       width: root.cardWidth
       height: root.cardHeight
-      radius: root.cornerRadius
-      anchors.centerIn: parent
-      color: root.background
-      borderSpec: root.borderSpec
+      // A panel from the right island (Set reminder in the quick toggles):
+      // attached under it, island glass, thin outline, island radius.
+      readonly property var tokens: Commons.Color.shellValues
+      readonly property var ears: BarGeometry.ears(panel.width, panel.screen ? String(panel.screen.name).indexOf("eDP") === 0 : true, tokens)
+      x: Math.round(ears.rightCenter - width / 2)
+      y: Tokens.num(tokens, "bar.height", 44) - Tokens.num(tokens, "island.gap", 3) + Tokens.num(tokens, "toast.gap", 0)
+      radius: Tokens.num(tokens, "island.radius", 9)
+      color: Util.alpha(Commons.Color.background, Tokens.num(tokens, "launcher.panel-background-alpha", 0.70))
+      borderSpec: Border.surfaceSpec("launcher", "panel-border", Util.alpha(Commons.Color.accent, Tokens.num(tokens, "launcher.panel-border-alpha", 0.16)), 1)
       padding: root.contentMargin
-      transformOrigin: Item.Center
+      transformOrigin: Item.Top
       transform: Scale {
         origin.x: card.width / 2
-        origin.y: card.height / 2
+        origin.y: 0
         xScale: motion.xScale
         yScale: motion.yScale
       }

@@ -110,8 +110,8 @@ close-ms                 = 100
 close-scale              = 0.97
 
 [toast]
-# Toasts (OSD) grow out of the right island: gap below the bar.
-gap                      = 8
+# Toasts grow out of the right island, attached: extra gap below the island (0 = touching).
+gap                      = 0
 
 [agents]
 # Usage records shown on the agents icon (ids in ~/.local/state/omarchy/agents/usage).

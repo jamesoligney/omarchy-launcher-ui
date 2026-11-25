@@ -118,7 +118,8 @@
     "jimmy.clipboard",
     "jimmy.reminders",
     "jimmy.battery",
-    "jimmy.osd"
+    "jimmy.osd",
+    "jimmy.notifications"
   ],
   "disabledPlugins": [
     "omarchy.lock",
@@ -127,7 +128,8 @@
     "omarchy.clipboard",
     "omarchy.reminders",
     "omarchy.battery",
-    "omarchy.osd"
+    "omarchy.osd",
+    "omarchy.notifications"
   ],
   "dock": {
     "autohide": true,
@@ -250,6 +252,9 @@
     },
     {
       "id": "jimmy.osd"
+    },
+    {
+      "id": "jimmy.notifications"
     }
   ],
   "version": 1

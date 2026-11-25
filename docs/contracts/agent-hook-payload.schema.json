@@ -5,46 +5,122 @@
   "description": "One event pushed by a coding agent's hook into the bar's mission control. Frozen contract (Stage 0); not implemented.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["v", "agent", "session", "event", "state", "at"],
+  "required": [
+    "v",
+    "agent",
+    "session",
+    "event",
+    "state",
+    "at"
+  ],
   "properties": {
-    "v": { "const": 1, "description": "Schema version. Breaking changes bump it; the receiver ignores versions it does not know." },
+    "v": {
+      "const": 1,
+      "description": "Schema version. Breaking changes bump it; the receiver ignores versions it does not know."
+    },
     "agent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$", "description": "Matches the usage record id in ~/.local/state/omarchy/agents/usage/<id>.json (claude, codex, grok, ...)." },
-        "name": { "type": "string", "maxLength": 64, "description": "Display name; the receiver falls back to the usage record's name." }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+          "description": "Matches the usage record id in ~/.local/state/omarchy/agents/usage/<id>.json (claude, codex, grok, ...)."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Display name; the receiver falls back to the usage record's name."
+        },
+        "account": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+          "description": "Which account of this agent the session runs under, tagged at the hook layer from the config dir the hook fires in (Claude: 'main' = Personal, 'teams' = Teams; ids as in ~/.local/state/omarchy/agents/accounts/<agent>.json). Optional: absent means the agent's active account. Added 2026-11-25 (Stage 4), additive, v stays 1."
+        }
       }
     },
     "session": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Stable for the life of one agent session; the receiver keys running agents by agent.id + session.id." },
-        "cwd": { "type": "string", "maxLength": 4096, "description": "Working directory. Shown as the project's folder name only." },
-        "pid": { "type": "integer", "minimum": 1, "description": "Agent process id, used to drop a session whose process is gone." },
-        "window": { "type": "string", "pattern": "^(0x)?[0-9a-fA-F]+$", "description": "Hyprland window address that hosts the session, so mission control can focus it." }
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Stable for the life of one agent session; the receiver keys running agents by agent.id + session.id."
+        },
+        "cwd": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "Working directory. Shown as the project's folder name only."
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Agent process id, used to drop a session whose process is gone."
+        },
+        "window": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]+$",
+          "description": "Hyprland window address that hosts the session, so mission control can focus it."
+        }
       }
     },
     "event": {
-      "enum": ["session_start", "prompt", "working", "tool", "waiting", "done", "error", "session_end"],
+      "enum": [
+        "session_start",
+        "prompt",
+        "working",
+        "tool",
+        "waiting",
+        "done",
+        "error",
+        "session_end"
+      ],
       "description": "What just happened."
     },
     "state": {
-      "enum": ["idle", "working", "waiting", "error", "ended"],
+      "enum": [
+        "idle",
+        "working",
+        "waiting",
+        "error",
+        "ended"
+      ],
       "description": "Where the session is now. 'waiting' means the agent needs the user (permission, question, finished turn) and drives the amber dot."
     },
-    "at": { "type": "string", "format": "date-time", "description": "When the event happened (ISO 8601, with offset)." },
-    "message": { "type": "string", "maxLength": 200, "description": "Short human line, e.g. the tool name or the question. No secrets, no file contents." },
-    "model": { "type": "string", "maxLength": 64 },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event happened (ISO 8601, with offset)."
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Short human line, e.g. the tool name or the question. No secrets, no file contents."
+    },
+    "model": {
+      "type": "string",
+      "maxLength": 64
+    },
     "tokens": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "input": { "type": "integer", "minimum": 0 },
-        "output": { "type": "integer", "minimum": 0 }
+        "input": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "description": "Optional per-turn counts. Limits stay in the usage records; hooks never report limits."
     }

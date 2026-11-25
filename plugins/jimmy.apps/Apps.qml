@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "../jimmy.shared"
+import "../jimmy.shared/Tokens.js" as Tokens
 
 // Every app on one grid. Type to narrow it, arrows to move, Enter to launch.
 // A copy of the dock's AppGrid, summoned from the launcher's Apps row, with the
@@ -19,6 +20,8 @@ Item {
   readonly property var appLibrary: shell ? shell.appLibrary : null
   property var dock: null
 
+  // Text face: [ui] font in shell.toml, else the menu font.
+  readonly property string fontFamily: Tokens.str(Commons.Color.shellValues, "ui.font", Style.font.menuFamily)
   property bool opened: false
   // The layer outlives `opened` by the close animation; keyboard focus does
   // not, so the app being launched gets focus at once.
@@ -171,7 +174,7 @@ Item {
 
   FontMetrics {
     id: labelMetrics
-    font.family: Style.font.menuFamily
+    font.family: root.fontFamily
     font.pixelSize: Style.font.body
   }
 
@@ -243,7 +246,7 @@ Item {
         scrim: Commons.Color.menu.scrim
         selectedBackground: Commons.Color.menu.selectedBackground
         selectedText: Commons.Color.menu.selectedText
-        fontFamily: Style.font.menuFamily
+        fontFamily: root.fontFamily
         cornerRadius: Style.cornerRadius
         onCanceled: root.cancelUninstall()
         onConfirmed: root.confirmUninstall()
@@ -313,7 +316,7 @@ Item {
             text: root.filterText || Commons.I18n.t("dock.searchApps")
             color: Commons.Color.menu.text
             opacity: root.filterText ? 1 : 0.58
-            font.family: Style.font.menuFamily
+            font.family: root.fontFamily
             font.pixelSize: Style.font.heading
             elide: Text.ElideRight
           }
@@ -379,7 +382,7 @@ Item {
                 textFormat: Text.PlainText
                 text: root.appLibrary ? root.appLibrary.entryName(cell.modelData) : ""
                 color: cell.selected ? Commons.Color.menu.selectedText : Commons.Color.menu.text
-                font.family: Style.font.menuFamily
+                font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignTop
@@ -429,7 +432,7 @@ Item {
             text: Commons.I18n.t("dock.noAppsMatch").arg(root.filterText)
             color: Commons.Color.menu.text
             opacity: 0.7
-            font.family: Style.font.menuFamily
+            font.family: root.fontFamily
             font.pixelSize: Style.font.title
           }
         }
@@ -520,7 +523,7 @@ Item {
       textFormat: Text.PlainText
       text: row.text
       color: Commons.Color.popups.text
-      font.family: Style.font.family
+      font.family: root.fontFamily
       font.pixelSize: Style.font.body
     }
 

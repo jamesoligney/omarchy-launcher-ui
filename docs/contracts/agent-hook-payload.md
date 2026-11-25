@@ -13,7 +13,7 @@ One JSON object per event. Required: `v`, `agent.id`, `session.id`, `event`, `st
 ```json
 {
   "v": 1,
-  "agent":   { "id": "claude", "name": "Claude Code" },
+  "agent":   { "id": "claude", "account": "teams", "name": "Claude Code" },
   "session": { "id": "8f1c…", "cwd": "/home/jimmy/orca/projects/omarchy-launcher-ui", "pid": 4242, "window": "0x55d1c0a8b2f0" },
   "event":   "waiting",
   "state":   "waiting",
@@ -28,6 +28,7 @@ One JSON object per event. Required: `v`, `agent.id`, `session.id`, `event`, `st
 | `event` | `session_start`, `prompt`, `working`, `tool`, `waiting`, `done`, `error`, `session_end` |
 | `state` | `idle`, `working`, `waiting` (needs the user: drives the amber dot), `error`, `ended` |
 | `agent.id` | Same id as the usage record in `~/.local/state/omarchy/agents/usage/<id>.json`, so live status and usage join on one key |
+| `agent.account` | Optional (added in Stage 4). Which account the session runs under, tagged by the hook from the config dir it fires in: for Claude `main` (Personal) or `teams` (Teams), the ids in `~/.local/state/omarchy/agents/accounts/claude.json`. Absent = the agent's active account. Additive, so `v` stays 1 |
 | `session.window` | Hyprland window address, so a click or key in mission control can focus the agent's window |
 | `tokens` | Optional per-turn counts. **Limits never come from hooks**; they stay in the usage records |
 

@@ -8,6 +8,7 @@ import qs.Ui
 import "MenuModel.js" as MenuModel
 import "Launcher.js" as Launcher
 import "../jimmy.shared"
+import "../jimmy.shared/Tokens.js" as Tokens
 
 Item {
   id: root
@@ -25,7 +26,7 @@ Item {
     var payload = ({})
     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
 
-    if (payload.fontFamily) root.fontFamily = payload.fontFamily
+    if (payload.fontFamily && !root.uiFont) root.fontFamily = payload.fontFamily
     // A shell that started mid-update may never have read the shipped menu
     // whole; reading it again here keeps the menu from opening empty.
     if (root.defaultMenuItems.length === 0) defaultMenuFile.reload()
@@ -56,7 +57,9 @@ Item {
 
   function ping() { return "ok" }
 
-  property string fontFamily: Style.font.menuFamily
+  // Text face: [ui] font in shell.toml (one weight system-wide), else the menu font.
+  readonly property string uiFont: Tokens.str(Commons.Color.shellValues, "ui.font", "")
+  property string fontFamily: uiFont || Style.font.menuFamily
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.
