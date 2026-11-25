@@ -151,3 +151,14 @@ pcall(hl.define_submap, "bar", "reset", function()
   o.bind("Escape", "Leave the leader", hl.dsp.submap("reset"))
 end)
 -- bar-leader: end
+
+-- >>> dictation-universal
+-- Push-to-talk (Right Option) also works while a submap is up, such as the
+-- bar leader (Super+D): the stock binds live in the global submap only.
+-- Same bind_hold as stock dictation.lua, plus submap_universal.
+if o.dictation_installed and o.dictation_installed() then
+  hl.unbind("ALT + Alt_R")
+  o.bind_hold("ALT + Alt_R", "Start dictation (push-to-talk)", "omarchy-dictation start",
+    "Stop dictation (push-to-talk)", "omarchy-dictation stop", { ignore_mods = true, submap_universal = true })
+end
+-- <<< dictation-universal
