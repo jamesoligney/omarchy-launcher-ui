@@ -8,6 +8,7 @@ Copies of the config that shapes the launcher, emoji and clipboard pickers, the 
 |---|---|---|
 | `hypr/` | `~/.config/hypr/` | `bindings.lua`, `hyprland.lua` (loader), `menu-glass.lua` (blur for the three pickers), `looknfeel.lua`, `monitors.lua`, `input.lua`, `autostart.lua`, `tricky-tiles.lua` (window animation, generated), `border-fx.lua`, `omarchy_fx.lua`, `no-shadow.lua`, others |
 | `omarchy/` | `~/.config/omarchy/` | `shell.json` (bar layout, plugin settings, disabled stock plugins), `shell.toml` (launcher design tokens), `tricky-tiles.json`, `omarchy-fx.conf`, `extensions/omarchy-menu.jsonc` (launcher menu rows), `hooks/`, `tweaks/` (notes), `themes/` (small theme files only), `third-party-plugins.tsv` |
+| `systemd/user/` | `~/.config/systemd/user/` | `omarchy-kbd-auto.service` (ambient keyboard backlight) |
 | `vicinae/` | `~/.config/vicinae/` | `settings.json` (the six app binds were removed from it) |
 
 ## Restore

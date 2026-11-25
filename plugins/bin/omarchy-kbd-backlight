@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""omarchy-kbd-backlight: ambient-light keyboard backlight, like macOS.
+
+  daemon          run the auto loop (the user service runs this)
+  up | down       manual step (stock 10 % step and OSD), pauses auto
+  hold            build start: save the level, set 0, pause auto
+  release         build end: restore the saved level, resume auto
+  status          print lux, level and mode as JSON
+  auto on | off   start or stop the user service
+
+The daemon never fights anything else that sets the backlight:
+  * a build hold (hold/release, or a hold older than hold_max_hours),
+  * the stock lock/idle blank (omarchy-brightness-keyboard off, until restore),
+  * any other change to the level (keys, brightnessctl): auto pauses for
+    override_min minutes after the last such change, then takes over again.
+
+Tuning: optional KEY=VALUE lines in ~/.config/omarchy/kbd-backlight.conf.
+"""
+import glob
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+
+DEVICE = "kbd_backlight"
+LED = f"/sys/class/leds/{DEVICE}"
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-kbd-backlight")
+HOLD = os.path.join(RUN, "hold")            # contents: level saved at hold
+OVERRIDE = os.path.join(RUN, "override-until")
+# The stock lock/idle blank keeps the pre-blank level here until it restores.
+STOCK_BLANK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), f"omarchy-brightness-keyboard-{DEVICE}")
+CONF = os.environ.get("OMARCHY_KBD_CONF") or os.path.expanduser("~/.config/omarchy/kbd-backlight.conf")
+UNIT = "omarchy-kbd-auto.service"
+
+DEFAULTS = {
+    "interval": 2.0,        # s between light samples (0.5 Hz; sysfs read, no fork)
+    "smoothing": 20.0,      # s, time constant of the moving average (log lux)
+    "lux_dark": 1.0,        # at or below: the full auto level
+    "lux_on": 10.0,         # light comes on when smoothed lux falls below this
+    "lux_off": 15.0,        # and goes off when it rises above this (hysteresis)
+    "max_level": 128,       # brightest auto level (of 255); manual keys go to 255
+    "step": 16,             # auto levels are multiples of this
+    "min_change": 2,        # move only when the target is this many steps away
+    "fade_ms": 400,         # length of a fade between levels
+    "override_min": 10.0,   # min auto stays paused after a manual change
+    "hold_max_hours": 4.0,  # a forgotten build hold expires after this
+}
+
+
+def config():
+    cfg = dict(DEFAULTS)
+    try:
+        with open(CONF) as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip()
+                if "=" in line:
+                    k, v = (s.strip() for s in line.split("=", 1))
+                    if k in cfg:
+                        cfg[k] = type(DEFAULTS[k])(float(v))
+    except (OSError, ValueError):
+        pass
+    return cfg
+
+
+def als_path():
+    if os.environ.get("OMARCHY_KBD_ALS"):          # testing: a file standing in for the sensor
+        return os.environ["OMARCHY_KBD_ALS"]
+    for name in glob.glob("/sys/bus/iio/devices/iio:device*/name"):
+        d = os.path.dirname(name)
+        if os.path.exists(os.path.join(d, "in_illuminance_input")):
+            return os.path.join(d, "in_illuminance_input")
+    return None
+
+
+def read(path, cast=float):
+    with open(path) as f:
+        return cast(f.read().strip())
+
+
+def level():
+    return read(f"{LED}/brightness", int)
+
+
+def max_level():
+    return read(f"{LED}/max_brightness", int)
+
+
+def set_level(value):
+    subprocess.run(["brightnessctl", "-q", "-d", DEVICE, "set", str(int(value))], check=False)
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+def journal(msg):
+    """CLI messages go to the journal next to the daemon's."""
+    subprocess.run(["logger", "-t", "omarchy-kbd-backlight", msg], check=False)
+    print(msg)
+
+
+def hold_active(cfg):
+    try:
+        age = time.time() - os.path.getmtime(HOLD)
+    except OSError:
+        return False
+    return age < cfg["hold_max_hours"] * 3600
+
+
+def override_active():
+    try:
+        return time.time() < read(OVERRIDE)
+    except (OSError, ValueError):
+        return False
+
+
+def start_override(cfg):
+    os.makedirs(RUN, exist_ok=True)
+    with open(OVERRIDE, "w") as f:
+        f.write(str(time.time() + cfg["override_min"] * 60))
+
+
+def target_for(lux, lit, cfg):
+    """Lux -> (level, lit). Off above lux_off, on below lux_on (hysteresis);
+    when lit, log-linear from lux_off (1 step) to lux_dark (max_level)."""
+    if lux >= cfg["lux_off"]:
+        lit = False
+    elif lux <= cfg["lux_on"]:
+        lit = True
+    if not lit:
+        return 0, False
+    span = math.log(cfg["lux_off"]) - math.log(cfg["lux_dark"])
+    frac = (math.log(cfg["lux_off"]) - math.log(max(lux, 1e-3))) / span
+    frac = min(1.0, max(0.0, frac))
+    step = cfg["step"]
+    value = round(frac * cfg["max_level"] / step) * step
+    return max(step, min(cfg["max_level"], value)), True
+
+
+def fade(start, end, cfg):
+    steps = max(1, int(cfg["fade_ms"] / 50))
+    for i in range(1, steps + 1):
+        set_level(round(start + (end - start) * i / steps))
+        time.sleep(cfg["fade_ms"] / 1000 / steps)
+
+
+def daemon():
+    cfg = config()
+    path = als_path()
+    if not path:
+        log("no ambient light sensor (in_illuminance_input) found; exiting")
+        return 1
+    alpha = 1 - math.exp(-cfg["interval"] / cfg["smoothing"])
+    smoothed = None          # log lux
+    lit = level() > 0
+    last_set = None          # what the daemon last wrote; None = adopt current
+    paused = None
+    log(f"started: sensor {path}, interval {cfg['interval']}s, smoothing {cfg['smoothing']}s, "
+        f"on <{cfg['lux_on']} lx, off >{cfg['lux_off']} lx, max {cfg['max_level']}, override {cfg['override_min']} min")
+    while True:
+        try:
+            lux = read(path)
+            x = math.log(max(lux, 1e-3))
+            smoothed = x if smoothed is None else smoothed + alpha * (x - smoothed)
+            cur = level()
+
+            reason = ("build hold" if hold_active(cfg)
+                      else "lock/idle blank" if os.path.exists(STOCK_BLANK)
+                      else None)
+            if reason is None and last_set is not None and cur != last_set:
+                start_override(cfg)
+                log(f"level changed to {cur} outside the daemon: auto paused {cfg['override_min']} min")
+                last_set = None
+            if reason is None and override_active():
+                reason = "manual override"
+            if reason != paused:
+                log(f"paused: {reason}" if reason else f"auto resumed at level {cur}")
+                paused = reason
+            if reason:
+                last_set = None
+                time.sleep(cfg["interval"])
+                continue
+
+            if last_set is None:
+                last_set = cur
+            target, lit = target_for(math.exp(smoothed), lit, cfg)
+            far = abs(target - cur) >= cfg["min_change"] * cfg["step"]
+            if target != cur and (far or (target == 0) != (cur == 0)):
+                log(f"lux {math.exp(smoothed):.2f} (raw {lux:.2f}): level {cur} -> {target}")
+                fade(cur, target, cfg)
+                last_set = target
+        except (OSError, ValueError) as err:
+            log(f"read error: {err}")
+        time.sleep(cfg["interval"])
+
+
+def manual(direction):
+    cfg = config()
+    start_override(cfg)
+    subprocess.run(["omarchy-brightness-keyboard", direction], check=False)
+    now, top = level(), max_level()
+    journal(f"manual {direction}: level {now}/{top} ({now * 100 // top}%), auto paused {cfg['override_min']} min")
+
+
+def hold():
+    os.makedirs(RUN, exist_ok=True)
+    if not os.path.exists(HOLD):
+        with open(HOLD, "w") as f:
+            f.write(str(level()))
+    else:
+        os.utime(HOLD)
+    set_level(0)
+    journal(f"hold: saved level {read(HOLD, int)}, backlight 0, auto paused until release")
+
+
+def release():
+    saved = None
+    try:
+        saved = read(HOLD, int)
+        os.remove(HOLD)
+    except (OSError, ValueError):
+        pass
+    if saved is not None:
+        set_level(saved)
+    try:
+        os.remove(OVERRIDE)
+    except OSError:
+        pass
+    journal(f"release: restored level {saved if saved is not None else level()}, auto resumes")
+
+
+def status():
+    cfg = config()
+    path = als_path()
+    active = subprocess.run(["systemctl", "--user", "is-active", UNIT], capture_output=True, text=True).stdout.strip()
+    mode = ("hold" if hold_active(cfg) else "lock/idle blank" if os.path.exists(STOCK_BLANK)
+            else "override" if override_active() else "auto" if active == "active" else "off")
+    out = {
+        "lux": round(read(path), 3) if path else None,
+        "level": level(),
+        "max": max_level(),
+        "mode": mode,
+        "service": active,
+    }
+    if mode == "override":
+        out["auto_resumes_in_s"] = int(read(OVERRIDE) - time.time())
+    print(json.dumps(out))
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd == "daemon":
+        return daemon()
+    if cmd in ("up", "down"):
+        return manual(cmd)
+    if cmd == "hold":
+        return hold()
+    if cmd == "release":
+        return release()
+    if cmd == "status":
+        return status()
+    if cmd == "auto" and len(argv) > 2 and argv[2] in ("on", "off"):
+        verb = "enable" if argv[2] == "on" else "disable"
+        return subprocess.run(["systemctl", "--user", verb, "--now", UNIT]).returncode
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv) or 0)

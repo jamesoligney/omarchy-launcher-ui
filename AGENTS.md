@@ -33,6 +33,12 @@ Efficient, clean, and light code is the standard, every iteration. No bloated, h
 ## Backups — standing rule
 Backups must be complete: **audit first, never commit a fraction.** Before snapshotting anything, list every file that determines the behaviour in question (plugins, binds, shell.json, shell.toml, hooks, themes, hypr includes, anything the loader pulls in), then include all of it. Anything left out must be named exactly in the report with the reason. Never put runtime state (clipboard history, pins, recents, pause flag, notifications) in git: it can hold copied secrets. Back it up locally in a timestamped, mode-700 folder under `~/.local/state/omarchy-launcher-backups/`. Verify the live files are unchanged (checksums before and after) and that the snapshot equals live.
 
+## Build start / end — standing rule
+- **Build start:** `omarchy-kbd-backlight hold` (saves the keyboard backlight level, sets it to 0, pauses the ambient-light daemon). If the screen must stay on for the build, `omarchy toggle idle stay-awake`.
+- **Build end:** `omarchy-kbd-backlight release` (restores the level, auto resumes) and, if stay-awake was set, `omarchy toggle idle allow-idle`. Confirm `omarchy-shell idle status` shows `"stayAwake": false`, so the screensaver kicks on as normal.
+- Never use bare `omarchy toggle idle` to check state; it flips it. Check with `omarchy toggle idle status` (`enabled:true` there means stay-awake is ON) or `omarchy-shell idle status`.
+- Do not set the keyboard backlight with raw `brightnessctl` during a build: the daemon treats an outside change as a manual override and takes over again after 10 minutes. `hold` pauses it until `release`, and a forgotten hold expires after 4 hours.
+
 ## Current state (2026-11-23)
 - v1 launcher live, v2 live with spaced keybind symbols (`⌘ ⇧ B`, `⌥ H`) and a 15–20% smaller panel. Animation did not land (see above).
 - Iteration 3a audit done (read-only, DeepSeek plan mode). Report: `docs/omarchy-launcher-iteration-3a-audit-report.md`. It confirms the six Vicinae binds, their storage (`~/.config/vicinae/settings.json` → `providers.applications.entrypoints`), and the emoji/clipboard gaps.

@@ -114,3 +114,15 @@ end)
 
 -- App shortcut, made from the Omarchy menu
 o.bind("ALT + K", "Keep", { launch = "gtk-launch 'Keep.desktop'" })
+
+-- kbd-backlight: begin
+-- Keyboard backlight up/down, through omarchy-kbd-backlight so a press pauses
+-- the ambient-light daemon (omarchy-kbd-auto.service) for 10 minutes. Same
+-- 10 % step and OSD as stock. Ctrl + display-brightness keys (Ctrl+F1/F2) is
+-- Omarchy's MacBook convention and always reaches Hyprland; the dedicated
+-- backlight keysyms are rebound too, in case this keyboard's F5/F6 send them.
+o.rebind("CTRL + XF86MonBrightnessDown", "Keyboard brightness down", "omarchy-kbd-backlight down", { locked = true, repeating = true })
+o.rebind("CTRL + XF86MonBrightnessUp", "Keyboard brightness up", "omarchy-kbd-backlight up", { locked = true, repeating = true })
+o.rebind("XF86KbdBrightnessDown", "Keyboard brightness down", "omarchy-kbd-backlight down", { locked = true, repeating = true })
+o.rebind("XF86KbdBrightnessUp", "Keyboard brightness up", "omarchy-kbd-backlight up", { locked = true, repeating = true })
+-- kbd-backlight: end

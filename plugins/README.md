@@ -31,3 +31,11 @@ omarchy restart shell
 ```
 
 `cp -a` overwrites same-named files and leaves other live files in place. `omarchy restart shell` only, never `omarchy refresh shell`.
+
+## Helper scripts (`plugins/bin/`)
+
+Live copies live in `~/.local/bin/`. Restore with `install -m 755 plugins/bin/<name> ~/.local/bin/<name>`.
+
+- `omarchy-launcher-paste`: the shared paste helper both pickers call.
+- `omarchy-kbd-backlight`: ambient-light keyboard backlight daemon and manual keys. Its user service is `config/systemd/user/omarchy-kbd-auto.service`; restore it to `~/.config/systemd/user/`, then `systemctl --user daemon-reload && systemctl --user enable --now omarchy-kbd-auto.service`.
+
