@@ -51,7 +51,10 @@ Item {
   readonly property int islandRadius: num("island.radius", 9)
   readonly property int islandPadding: num("island.padding-x", 10)
   readonly property int islandSpacing: num("island.spacing", 12)
-  readonly property int fontSize: num("island.font-size", 16)
+  // Letters and numbers, and glyphs, sized apart (island.text-size,
+  // island.glyph-size). The status island's lights have their own size.
+  readonly property int textSize: num("island.text-size", 18)
+  readonly property int glyphSize: num("island.glyph-size", 20)
   readonly property real quietAlpha: num("island.quiet-alpha", 0.72)
   readonly property int appMaxWidth: num("island.app-max-width", 200)
   readonly property int batteryLow: num("battery.low", 20)
@@ -439,7 +442,7 @@ Item {
     anchors.verticalCenter: parent ? parent.verticalCenter : undefined
     color: root.quiet
     font.family: root.fontFamily
-    font.pixelSize: root.fontSize
+    font.pixelSize: root.textSize
     font.features: { "tnum": 1 }
     textFormat: Text.PlainText
   }
@@ -463,6 +466,7 @@ Item {
     property bool on: false
     visible: on
     font.family: root.iconFamily
+    font.pixelSize: root.glyphSize
   }
 
   // Click an element to toggle its hosted panel.
@@ -711,7 +715,7 @@ Item {
             WeatherIcon {
               id: weatherGlyph
               key: root.weatherIcon
-              size: root.fontSize
+              size: root.glyphSize
               color: root.quiet
               opacity: weatherStaleness.state === "fresh" ? 1 : 0.5
             }
@@ -782,16 +786,16 @@ Item {
               onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
               Hint { text: "M" }
             }
-            // Agents: no alarm colour. Accent while an agent window runs,
-            // whatever the limits say; otherwise quiet at 60%. Limits stay
-            // in the agents panel and in status.
+            // Agents: plain for now, like the other lights at rest: quiet at
+            // 60%, always. Running and limits show in the agents panel and in
+            // status until model activity gets its own design.
             StatusLight {
               id: agentsLight
               slot: 3
               target: "omarchy.agents"
               text: "\udb81\ude74"
-              color: root.agentRunning ? root.accent : root.quiet
-              dim: root.agentRunning ? 1 : 0.6
+              color: root.quiet
+              dim: 0.6
               Hint { text: "A" }
             }
           }
@@ -847,6 +851,7 @@ Item {
                   x: root.islandSpacing / 2
                   text: modelData.icon
                   font.family: root.iconFamily
+                  font.pixelSize: root.glyphSize
                   color: modelData.on ? root.accent : root.quiet
                   opacity: modelData.on ? 1 : 0.45
                 }
@@ -869,7 +874,7 @@ Item {
           TextMetrics {
             id: stayMetrics
             font.family: root.iconFamily
-            font.pixelSize: root.fontSize
+            font.pixelSize: root.glyphSize
             text: root.quickItems[root.quickItems.length - 1].icon
           }
         }

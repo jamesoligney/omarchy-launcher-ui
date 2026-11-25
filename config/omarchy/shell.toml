@@ -84,8 +84,10 @@ glow-blur                = 20
 # them and the radius of the corners that face each other.
 joint-gap                = 4
 joint-radius             = 2
-# Text and glyph size inside the islands.
-font-size                = 20
+# Letters and numbers in the islands (time, battery, app name, workspace
+# numbers), and glyphs (weather, lights, quick icons, the cup), sized apart.
+text-size                = 18
+glyph-size               = 20
 # Quiet contract: everything but the active workspace, the app name and
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72

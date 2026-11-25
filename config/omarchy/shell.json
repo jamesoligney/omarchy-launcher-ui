@@ -219,11 +219,11 @@
       "shimmerScaleMax": 1.45,
       "shimmerScaleMin": 0.75,
       "gradient": [
-        "rgba(8aeeffee)",
-        "rgba(1fffec00)"
+        "rgba(ff3437ee)",
+        "rgba(df003800)"
       ],
       "gradientPositions": "0 99",
-      "baseColor": "rgba(144347dd)"
+      "baseColor": "rgba(470409dd)"
     },
     {
       "clock12": true,
