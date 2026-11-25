@@ -89,8 +89,8 @@ critical                 = 10
 # The battery pill: wide and tall enough to hold the % inside.
 bar-width                = 52
 bar-height               = 22
-# Charging pulse at the fill edge: one loop, ms.
-pulse-ms                 = 1800
+# Charging: one slow colour drift of the 1px outline, ms per full loop.
+shimmer-ms               = 7000
 
 [clock]
 # Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.

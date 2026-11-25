@@ -133,3 +133,21 @@ o.rebind("XF86KbdBrightnessUp", "Keyboard brightness up", "omarchy-kbd-backlight
 -- time opens the same pop-out.
 o.bind("SUPER + CTRL + Q", "Quick toggles", "omarchy-shell jimmy.bar quick")
 -- bar-quick: end
+
+-- bar-leader: begin
+-- Super+D, then one key: the bar's leader (refined brief). 1-9 workspace,
+-- W weather, T calendar, B battery / power, A agents, Q quick toggles, Esc
+-- leave. One key and the submap resets; the bar shows each letter meanwhile.
+o.bind("SUPER + D", "Bar leader", hl.dsp.submap("bar"))
+pcall(hl.define_submap, "bar", "reset", function()
+  for slot = 1, 9 do
+    o.bind("code:" .. tostring(slot + 9), "Workspace " .. slot, o.workspaces.focus(slot))
+  end
+  o.bind("W", "Weather", "omarchy-shell shell toggle omarchy.weather")
+  o.bind("T", "Calendar", "omarchy-shell shell toggle omarchy.clock")
+  o.bind("B", "Battery and power", "omarchy-shell shell toggle omarchy.power")
+  o.bind("A", "Agents", "omarchy-shell shell toggle omarchy.agents")
+  o.bind("Q", "Quick toggles", "omarchy-shell jimmy.bar quick")
+  o.bind("Escape", "Leave the leader", hl.dsp.submap("reset"))
+end)
+-- bar-leader: end

@@ -55,7 +55,7 @@ Item {
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property int batteryWidth: num("battery.bar-width", 52)
   readonly property int batteryHeight: num("battery.bar-height", 22)
-  readonly property int pulseMs: num("battery.pulse-ms", 1800)
+  readonly property int shimmerMs: num("battery.shimmer-ms", 7000)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
   readonly property int fullscreenDebounce: num("fullscreen.debounce-ms", 50)
   readonly property string clockFormat: Tokens.str(tokens, "clock.format", "h:mm")
@@ -80,6 +80,17 @@ Item {
   readonly property int batteryPercent: battery && battery.isPresent ? Math.round(battery.percentage * 100) : -1
   readonly property bool charging: battery ? (battery.state === UPowerDeviceState.Charging
     || battery.state === UPowerDeviceState.PendingCharge) : false
+  // Charging: the battery pill's 1px outline drifts slowly between two accent
+  // shades, low contrast, one loop of battery.shimmer-ms; nothing pulses.
+  property color shimmerColor: Util.alpha(Commons.Color.accent, 0.35)
+  readonly property color shimmerLow: Util.alpha(Commons.Color.accent, 0.35)
+  readonly property color shimmerHigh: Util.alpha(Qt.lighter(Commons.Color.accent, 1.2), 0.75)
+  SequentialAnimation on shimmerColor {
+    running: root.charging
+    loops: Animation.Infinite
+    ColorAnimation { from: root.shimmerLow; to: root.shimmerHigh; duration: root.shimmerMs / 2; easing.type: Easing.InOutSine }
+    ColorAnimation { from: root.shimmerHigh; to: root.shimmerLow; duration: root.shimmerMs / 2; easing.type: Easing.InOutSine }
+  }
 
   readonly property string appName: {
     var top = ToplevelManager.activeToplevel
@@ -97,6 +108,9 @@ Item {
   readonly property bool remoteActive: !!remoteService && remoteService.active === true
   readonly property bool micInUse: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].inUse === true
   property bool recording: false
+  // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
+  // every element shows its letter.
+  property bool leaderActive: false
 
   // Weather: the hosted stock weather widget fetches (stock source and
   // interval); the island reads its loaded panel.
@@ -156,30 +170,20 @@ Item {
   }
   readonly property bool agentNearLimit: agentPeak >= nearLimit
 
-  // Which Claude account the single claude.json usage record belongs to: the
-  // active one in accounts/claude.json. The other account has no record of
-  // its own (open investigation #13), so its capsule shows "no data".
-  property string claudeActive: "main"
-  FileView {
-    path: Quickshell.env("HOME") + "/.local/state/omarchy/agents/accounts/claude.json"
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: { try { root.claudeActive = String(JSON.parse(text()).active || "main") } catch (e) {} }
-  }
   function peakOf(record) {
     var peak = -1, limits = record && record.limits
     for (var i = 0; limits && i < limits.length; i++) peak = Math.max(peak, Number(limits[i].percent) || 0)
     return peak
   }
-  // One capsule per model, fixed order. peak = highest limit used (0-1),
-  // -1 = no data. Colour = state: over limit, near limit, or calm.
-  readonly property var agentModels: [
-    { id: "claude-main", label: "Claude Personal", peak: claudeActive === "main" ? peakOf(agentRecords["claude"]) : -1 },
-    { id: "claude-teams", label: "Claude Teams", peak: claudeActive === "teams" ? peakOf(agentRecords["claude"]) : -1 },
-    { id: "opencode", label: "OpenCode", peak: peakOf(agentRecords["opencode"]) },
-    { id: "grok", label: "Grok", peak: peakOf(agentRecords["grok"]) }
-  ]
+  // The one AI mark's state, worst first: over a limit, near one, an agent
+  // window running, or idle. Only what the data can say.
+  readonly property string agentState: {
+    var worst = -1
+    for (var id in agentRecords) worst = Math.max(worst, peakOf(agentRecords[id]))
+    if (worst >= 1) return "over"
+    if (worst >= nearLimit) return "near"
+    return agentRunning ? "running" : "idle"
+  }
   readonly property bool agentRunning: {
     var tops = ToplevelManager.toplevels.values
     for (var i = 0; i < tops.length; i++) if (tops[i].appId === "org.omarchy.agent") return true
@@ -213,11 +217,13 @@ Item {
         hosted: Object.keys(root.hosts),
         weather: { panel: !!root.weatherData, icon: root.weatherIcon, state: weatherStaleness.state, age: weatherStaleness.ageText,
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
-        battery: { percent: root.batteryPercent, charging: root.charging },
+        battery: { percent: root.batteryPercent, charging: root.charging, shimmer: String(root.shimmerColor) },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
-        agents: { models: root.agentModels, running: root.agentRunning, claudeActive: root.claudeActive },
+        agents: { state: root.agentState, running: root.agentRunning,
+          peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
+        leader: root.leaderActive,
         silenced: root.silenced,
-        quick: { opened: quick.opened, keyboard: quick.keyboard },
+        quick: { opened: quick.opened, keyboard: quick.keyboard, hoverTime: root.quickHoverTime, hoverCard: root.quickHoverCard },
         adopted: adopter.adoptedIds,
         lastAdopt: adopter.lastAttempt
       })
@@ -340,6 +346,19 @@ Item {
     textFormat: Text.PlainText
   }
 
+  // The leader letter for an element, shown only while the leader is active.
+  component Hint: Text {
+    visible: root.leaderActive
+    anchors.right: parent ? parent.right : undefined
+    anchors.top: parent ? parent.top : undefined
+    anchors.rightMargin: -6
+    anchors.topMargin: -2
+    text: ""
+    color: root.accent
+    font.family: root.fontFamily
+    font.pixelSize: 10
+  }
+
   component Light: Label {
     property bool on: false
     visible: on
@@ -403,6 +422,8 @@ Item {
     contentWidth: 230
     contentHeight: quickColumn.implicitHeight
     onDismissed: quick.opened = false
+    // The whole card counts as the hover zone, padding included.
+    onHoveredChanged: { root.quickHoverCard = hovered; quickHoverTimer.restart() }
 
     Item {
       id: quickKeys
@@ -415,12 +436,6 @@ Item {
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.runQuick(root.quickItems[root.quickIndex].key)
         else return
         event.accepted = true
-      }
-      MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.NoButton
-        onContainsMouseChanged: { root.quickHoverCard = containsMouse; quickHoverTimer.restart() }
       }
       Column {
         id: quickColumn
@@ -554,7 +569,9 @@ Item {
         Connections {
           target: Hyprland
           function onRawEvent(event) {
-            if (event && String(event.name) === "fullscreen") Hyprland.refreshToplevels()
+            var name = event ? String(event.name) : ""
+            if (name === "fullscreen") Hyprland.refreshToplevels()
+            else if (name === "submap") root.leaderActive = String(event.data) === "bar"
           }
         }
 
@@ -575,6 +592,8 @@ Item {
                 height: root.islandHeight - 8
                 radius: root.islandRadius - 3
                 color: modelData.active ? Util.alpha(root.accent, 0.22) : "transparent"
+                border.width: root.leaderActive ? 1 : 0
+                border.color: Util.alpha(root.accent, 0.6)
                 Label {
                   id: slotText
                   anchors.centerIn: parent
@@ -584,7 +603,7 @@ Item {
                 MouseArea {
                   anchors.fill: parent
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: Hyprland.dispatch("workspace " + parent.modelData.id)
+                  onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "' + parent.modelData.id + '" })')
                 }
               }
             }
@@ -618,12 +637,19 @@ Item {
 
           // Time, nearest the notch. Click: calendar. Hover: quick toggles.
           Label {
+            height: root.islandHeight
+            verticalAlignment: Text.AlignVCenter
             text: Qt.formatTime(clock.date, root.clockFormat)
+            // The hover zone runs the full island height, so it ends exactly
+            // where the attached pop-out card begins: no dead band between.
             Tap {
               target: "omarchy.clock"
+              anchors.topMargin: -root.islandGap
+              anchors.bottomMargin: -root.islandGap
               hoverEnabled: true
               onContainsMouseChanged: root.hoverQuick(containsMouse)
             }
+            Hint { text: "T Q" }
           }
 
           // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
@@ -648,6 +674,7 @@ Item {
               color: root.urgent
             }
             Tap { target: "omarchy.weather" }
+            Hint { text: "W" }
           }
 
           // Battery: fixed-width pill, % inside, fill = charge.
@@ -664,7 +691,7 @@ Item {
               radius: height / 2
               color: "transparent"
               border.width: 1
-              border.color: Util.alpha(batteryPill.tone, 0.55)
+              border.color: root.charging ? root.shimmerColor : Util.alpha(batteryPill.tone, 0.55)
             }
             Rectangle {
               x: 2; y: 2
@@ -673,23 +700,6 @@ Item {
               radius: height / 2
               color: Util.alpha(batteryPill.tone, root.batteryPercent <= root.batteryLow ? 0.55 : 0.28)
               Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-            }
-            // Charging: the outline pulses in the system accent, one slow
-            // loop; the pill and the number stay calm.
-            Rectangle {
-              visible: root.charging
-              anchors.fill: parent
-              anchors.margins: -2
-              radius: height / 2
-              color: "transparent"
-              border.width: 2
-              border.color: root.accent
-              SequentialAnimation on opacity {
-                running: root.charging && !screenScope.hidden
-                loops: Animation.Infinite
-                NumberAnimation { from: 0.25; to: 1.0; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
-                NumberAnimation { from: 1.0; to: 0.25; duration: root.pulseMs / 2; easing.type: Easing.InOutSine }
-              }
             }
             Text {
               anchors.centerIn: parent
@@ -700,62 +710,41 @@ Item {
               font.features: { "tnum": 1 }
             }
             Tap { target: "omarchy.power" }
+            Hint { text: "B" }
           }
 
           // Contextual lights: never hidden while on. Mic is primary and sits
           // rightmost; the others stack to its left.
           Light { on: root.remoteActive; text: "󰢹"; color: root.urgent }
-          Light { on: root.recording; text: "󰻂"; color: root.urgent }
-          Light { on: root.micInUse; text: "󰍬"; color: root.urgent }
-
-          // Agents: one slim capsule per model (Claude Personal, Claude Teams,
-          // OpenCode, Grok). Fill = highest limit used; colour = state (red
-          // over limit, accent near limit, calm otherwise); a dim empty
-          // outline = no data. Click: the agents panel, per-model detail.
-          Item {
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: agentRow.implicitWidth
-            implicitHeight: root.islandHeight
-          Row {
-            id: agentRow
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
-            Label {
-              text: "\udb81\udea9"
-              font.family: root.iconFamily
-              opacity: root.agentRunning ? 1 : 0.6
-            }
-            Repeater {
-              model: root.agentModels
-              Item {
-                required property var modelData
-                anchors.verticalCenter: parent.verticalCenter
-                width: 6
-                height: Math.round(root.islandHeight * 0.5)
-                readonly property real peak: modelData.peak
-                readonly property color tone: peak >= 1 ? root.urgent : (peak >= root.nearLimit ? root.accent : root.ink)
-                opacity: peak < 0 ? 0.35 : 1
-                Rectangle {
-                  anchors.fill: parent
-                  radius: width / 2
-                  color: "transparent"
-                  border.width: 1
-                  border.color: Util.alpha(parent.tone, 0.55)
-                }
-                Rectangle {
-                  visible: parent.peak > 0
-                  anchors.bottom: parent.bottom
-                  anchors.horizontalCenter: parent.horizontalCenter
-                  width: parent.width
-                  height: Math.max(width, parent.height * Math.min(1, parent.peak))
-                  radius: width / 2
-                  color: Util.alpha(parent.tone, parent.peak >= root.nearLimit ? 0.85 : 0.45)
-                  Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-                }
-              }
+          Light {
+            on: root.recording; text: "󰻂"; color: root.urgent
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: Quickshell.execDetached(["omarchy-capture-screenrecording", "--stop-recording"])
             }
           }
+          Light {
+            on: root.micInUse; text: "󰍬"; color: root.urgent
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
+            }
+          }
+
+          // Agents: one quiet AI mark. Calm at rest; colour only when
+          // something is worth seeing (red over a limit, accent near one,
+          // full when an agent window runs). Click: the agents panel.
+          Label {
+            text: "\udb81\ude74"
+            font.family: root.iconFamily
+            color: root.agentState === "over" ? root.urgent
+              : root.agentState === "near" ? root.accent
+              : root.agentState === "running" ? root.ink : root.quiet
+            opacity: root.agentState === "idle" ? 0.6 : 1
             Tap { target: "omarchy.agents" }
+            Hint { text: "A" }
           }
         }
 

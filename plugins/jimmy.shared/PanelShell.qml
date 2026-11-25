@@ -24,6 +24,8 @@ PanelWindow {
   property real contentWidth: 240
   property real contentHeight: 120
   property alias card: card
+  // True while the pointer is anywhere over the card (padding included).
+  readonly property bool hovered: cardHover.hovered
   default property alias content: holder.data
   signal dismissed()
 
@@ -86,6 +88,7 @@ PanelWindow {
     }
     // Clicks on the card stay on the card.
     MouseArea { anchors.fill: parent }
+    HoverHandler { id: cardHover }
     Item {
       id: holder
       x: shell.pad
