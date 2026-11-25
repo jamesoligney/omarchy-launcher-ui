@@ -165,3 +165,10 @@ if o.dictation_installed and o.dictation_installed() then
     "Stop dictation (push-to-talk)", "omarchy-dictation stop", { ignore_mods = true, submap_universal = true })
 end
 -- <<< dictation-universal
+
+-- >>> float-default
+-- Super+T floats a window at the default floating size, centred, the first
+-- time (size and rule: hypr/float-default.lua).
+require("hypr.float-default")
+o.rebind("SUPER + T", "Toggle window floating/tiling", function() o.float_toggle() end)
+-- <<< float-default
