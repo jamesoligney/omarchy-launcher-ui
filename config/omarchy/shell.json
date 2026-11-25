@@ -210,12 +210,6 @@
       "waitingSound": "bell"
     },
     {
-      "baseColor": "rgba(184714dd)",
-      "gradient": [
-        "rgba(8cff8aee)",
-        "rgba(57ff1f00)"
-      ],
-      "gradientPositions": "0 99",
       "id": "wmfeht.border-fx",
       "lobe": 0.3,
       "mirror": true,
@@ -223,7 +217,13 @@
       "shimmerDeg": 35,
       "shimmerHz": 0.45,
       "shimmerScaleMax": 1.45,
-      "shimmerScaleMin": 0.75
+      "shimmerScaleMin": 0.75,
+      "gradient": [
+        "rgba(8aeeffee)",
+        "rgba(1fffec00)"
+      ],
+      "gradientPositions": "0 99",
+      "baseColor": "rgba(144347dd)"
     },
     {
       "clock12": true,

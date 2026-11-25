@@ -14,7 +14,7 @@ import "../jimmy.shared/Tokens.js" as Tokens
 import "../jimmy.shared/AppName.js" as AppName
 import "../jimmy.shared/BarGeometry.js" as BarGeometry
 // The stock weather glyph set (9 conditions, day/night), reused as-is.
-import "/usr/share/omarchy/shell/plugins/panels/weather/Model.js" as WeatherModel
+import "WeatherIcons.js" as WeatherIcons
 import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkModel
 
 // Islands bar, Stage 3: islands live.
@@ -174,8 +174,9 @@ Item {
   // The panel's own icon comes only from open-meteo once coordinates are set,
   // and open-meteo refuses curl's default User-Agent on that request (403), so
   // derive it from the current conditions, which fall back to wttr.in.
-  readonly property string weatherIcon: weatherData
-    ? String(weatherData.label || WeatherModel.currentIcon(weatherData.current, "")) : ""
+  // The island's own icon set (WeatherIcons.js): a condition key from the
+  // same current reading the stock icon uses.
+  readonly property string weatherIcon: weatherData ? WeatherIcons.key(weatherData.current) : ""
   Staleness {
     id: weatherStaleness
     intervalMs: (root.weatherData ? root.weatherData.refreshMinutes : 15) * 60000
@@ -288,6 +289,8 @@ Item {
   readonly property var hostIds: ["omarchy.audio", "omarchy.bluetooth", "omarchy.network", "omarchy.power",
     "omarchy.monitor", "omarchy.clock", "omarchy.weather", "omarchy.agents", "omarchy.microphone",
     "io.github.cwilliams5.locus"]
+  // Panels for the status island's lights drop from the status island.
+  readonly property var statusHostIds: ["omarchy.network", "omarchy.bluetooth", "omarchy.microphone", "omarchy.agents"]
   property var hosts: ({})
   property var activePopout: null
   // Hosted panels open in the shared panel language (PanelShell family).
@@ -682,31 +685,6 @@ Item {
             Hint { text: "C" }
           }
 
-          // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
-          Item {
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: weatherGlyph.implicitWidth + (offlineMark.visible ? offlineMark.implicitWidth : 0)
-            implicitHeight: weatherGlyph.implicitHeight
-            visible: root.weatherIcon !== ""
-            Label {
-              id: weatherGlyph
-              anchors.verticalCenter: undefined
-              font.family: root.iconFamily
-              text: root.weatherIcon
-              opacity: weatherStaleness.state === "fresh" ? 1 : 0.5
-            }
-            Label {
-              id: offlineMark
-              anchors.verticalCenter: undefined
-              x: weatherGlyph.implicitWidth
-              visible: weatherStaleness.state === "offline"
-              text: "·"
-              color: root.urgent
-            }
-            Tap { target: "omarchy.weather" }
-            Hint { text: "W" }
-          }
-
           // Battery: the number only. Accent while plugged in, neutral on
           // battery, amber at battery.low and red at battery.critical.
           Label {
@@ -721,6 +699,31 @@ Item {
             Sparks { running: root.charging && window.visible; onFired: { root.sparks++; root.sparkSides = sides } }
           }
 
+          // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
+          Item {
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: weatherGlyph.width + (offlineMark.visible ? offlineMark.implicitWidth : 0)
+            implicitHeight: weatherGlyph.height
+            visible: root.weatherIcon !== ""
+            WeatherIcon {
+              id: weatherGlyph
+              key: root.weatherIcon
+              size: root.fontSize
+              color: root.quiet
+              opacity: weatherStaleness.state === "fresh" ? 1 : 0.5
+            }
+            Label {
+              id: offlineMark
+              anchors.verticalCenter: undefined
+              x: weatherGlyph.width
+              visible: weatherStaleness.state === "offline"
+              text: "·"
+              color: root.urgent
+            }
+            Tap { target: "omarchy.weather" }
+            Hint { text: "W" }
+          }
+
           // Contextual lights: only while on (the mic lives in the status
           // island now, persistent).
           Light { on: root.remoteActive; text: "󰢹"; color: root.urgent }
@@ -733,23 +736,10 @@ Item {
             }
           }
 
-          // Agents: one quiet AI mark. Calm at rest; colour only when
-          // something is worth seeing (red over a limit, accent near one,
-          // full when an agent window runs). Click: the agents panel.
-          Label {
-            text: "\udb81\ude74"
-            font.family: root.iconFamily
-            color: root.agentState === "over" ? root.urgent
-              : root.agentState === "near" ? root.accent
-              : root.agentState === "running" ? root.ink : root.quiet
-            opacity: root.agentState === "idle" ? 0.6 : 1
-            Tap { target: "omarchy.agents" }
-            Hint { text: "A" }
-          }
         }
 
         // ------------------------------------------------- status island
-        // Wi-Fi, Bluetooth, mic: persistent status lights, small and staggered
+        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, small and staggered
         // on two rows. Joined to the right island across island.joint-gap,
         // the facing corners square, so the two read as one island divided;
         // the right island keeps its centre in the ear, this one hangs off
@@ -762,7 +752,7 @@ Item {
           glow: false
           Item {
             anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: 2 * root.statusStep + micLight.width
+            implicitWidth: 3 * root.statusStep + agentsLight.width
             implicitHeight: root.islandHeight
             StatusLight {
               slot: 0
@@ -788,6 +778,19 @@ Item {
               dim: root.micInUse ? 1 : 0.45
               onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
               Hint { text: "M" }
+            }
+            // Agents: calm at rest; red over a limit, accent near one, full
+            // while an agent window runs.
+            StatusLight {
+              id: agentsLight
+              slot: 3
+              target: "omarchy.agents"
+              text: "\udb81\ude74"
+              color: root.agentState === "over" ? root.urgent
+                : root.agentState === "near" ? root.accent
+                : root.agentState === "running" ? root.ink : root.quiet
+              dim: root.agentState === "idle" ? 0.6 : 1
+              Hint { text: "A" }
             }
           }
         }
@@ -869,34 +872,44 @@ Item {
           }
         }
 
-        // Hosted stock panel widgets: invisible, under the right island, so
-        // their panels drop from it.
-        Item {
+        // Hosted stock panel widgets: invisible, under the island that holds
+        // their element, so a panel drops from the island its icon lives in.
+        Hosts {
           x: Math.round(window.ears.rightCenter)
-          y: 0
-          width: 1
-          height: root.barHeight
-          opacity: 0
-          enabled: false
-          Repeater {
-            model: root.hostIds
-            Loader {
-              required property string modelData
-              width: 1
-              height: root.barHeight
-              active: !!root.barWidgetRegistry && !!root.barWidgetRegistry.widgets[modelData]
-              sourceComponent: active ? root.barWidgetRegistry.widgets[modelData].component : null
-              onLoaded: {
-                if ("bar" in item) item.bar = root.apiFor(modelData)
-                if ("moduleName" in item) item.moduleName = modelData
-                if ("settings" in item) item.settings = root.entrySettings(modelData)
-                if (modelData === "omarchy.weather") root.weatherLoader = root.loaderIn(item)
-                var next = Object.assign({}, root.hosts)
-                next[modelData] = item
-                root.hosts = next
-              }
-            }
-          }
+          ids: root.hostIds.filter(function(id) { return root.statusHostIds.indexOf(id) < 0 })
+        }
+        Hosts {
+          x: Math.round(statusIsland.x + statusIsland.width / 2)
+          ids: root.statusHostIds
+        }
+      }
+    }
+  }
+
+  // An invisible home for hosted stock bar widgets: their panels drop from
+  // its x. One sits under the right island, one under the status island.
+  component Hosts: Item {
+    property var ids: []
+    width: 1
+    height: root.barHeight
+    opacity: 0
+    enabled: false
+    Repeater {
+      model: parent.ids
+      Loader {
+        required property string modelData
+        width: 1
+        height: root.barHeight
+        active: !!root.barWidgetRegistry && !!root.barWidgetRegistry.widgets[modelData]
+        sourceComponent: active ? root.barWidgetRegistry.widgets[modelData].component : null
+        onLoaded: {
+          if ("bar" in item) item.bar = root.apiFor(modelData)
+          if ("moduleName" in item) item.moduleName = modelData
+          if ("settings" in item) item.settings = root.entrySettings(modelData)
+          if (modelData === "omarchy.weather") root.weatherLoader = root.loaderIn(item)
+          var next = Object.assign({}, root.hosts)
+          next[modelData] = item
+          root.hosts = next
         }
       }
     }
