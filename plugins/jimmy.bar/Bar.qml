@@ -161,9 +161,6 @@ Item {
   readonly property int glowBlur: num("island.glow-blur", 20)
   readonly property int jointGap: num("island.joint-gap", 4)
   readonly property int jointRadius: num("island.joint-radius", 2)
-  readonly property int statusSize: num("status.icon-size", 13)
-  readonly property int statusStep: num("status.step", 20)
-  readonly property int statusPadding: num("status.padding-x", 16)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
 
@@ -410,24 +407,23 @@ Item {
     }
   }
 
-  // A status light in the status island: small, in one row, step px apart,
-  // centred in the island. The item spans the island's height so its leader
-  // letter lands on the outline like the rest.
+  // A status light in the status island: an island element like any other,
+  // at the glyph size, laid out by the island's row. It spans the island's
+  // height so its leader letter lands on the outline like the rest.
   component StatusLight: Item {
-    property int slot: 0
     property alias text: glyph.text
     property alias color: glyph.color
     property alias dim: glyph.opacity
     property string target: ""
     signal tapped()
-    x: slot * root.statusStep
-    width: glyph.implicitWidth
-    height: root.islandHeight
+    anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+    implicitWidth: glyph.implicitWidth
+    implicitHeight: root.islandHeight
     Text {
       id: glyph
-      y: Math.round(parent.height / 2 - height / 2)
+      anchors.verticalCenter: parent.verticalCenter
       font.family: root.iconFamily
-      font.pixelSize: root.statusSize
+      font.pixelSize: root.glyphSize
       textFormat: Text.PlainText
     }
     MouseArea {
@@ -746,58 +742,46 @@ Item {
         }
 
         // ------------------------------------------------- status island
-        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, small, in
-        // one row. Joined to the right island across island.joint-gap,
-        // the facing corners square, so the two read as one island divided;
-        // the right island keeps its centre in the ear, this one hangs off
-        // its right. Room for more lights: each adds statusStep px.
+        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, the same
+        // size, padding and spacing as every island element. Joined to the
+        // right island across island.joint-gap, the facing corners square,
+        // so the two read as one island divided; the right island keeps its
+        // centre in the ear, this one hangs off its right.
         Island {
           id: statusIsland
           x: rightIsland.x + rightIsland.width + root.jointGap
-          padding: root.statusPadding
           joinLeft: true
           glow: false
-          Item {
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: 3 * root.statusStep + agentsLight.width
-            implicitHeight: root.islandHeight
-            StatusLight {
-              slot: 0
-              target: "omarchy.network"
-              text: root.netIcon
-              color: root.netState === "down" ? root.urgent : root.quiet
-              dim: root.netState === "off" ? 0.45 : 1
-              Hint { text: "N" }
-            }
-            StatusLight {
-              slot: 1
-              target: "omarchy.bluetooth"
-              text: root.btIcon
-              color: root.btConnected ? root.accent : root.quiet
-              dim: root.btOn ? 1 : 0.45
-              Hint { text: "T" }
-            }
-            StatusLight {
-              id: micLight
-              slot: 2
-              text: root.micMuted ? "󰍭" : "󰍬"
-              color: root.micInUse ? root.accent : root.quiet
-              dim: root.micInUse ? 1 : 0.45
-              onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
-              Hint { text: "M" }
-            }
-            // Agents: plain for now, like the other lights at rest: quiet at
-            // 60%, always. Running and limits show in the agents panel and in
-            // status until model activity gets its own design.
-            StatusLight {
-              id: agentsLight
-              slot: 3
-              target: "omarchy.agents"
-              text: "\udb81\ude74"
-              color: root.quiet
-              dim: 0.6
-              Hint { text: "A" }
-            }
+          StatusLight {
+            target: "omarchy.network"
+            text: root.netIcon
+            color: root.netState === "down" ? root.urgent : root.quiet
+            dim: root.netState === "off" ? 0.45 : 1
+            Hint { text: "N" }
+          }
+          StatusLight {
+            target: "omarchy.bluetooth"
+            text: root.btIcon
+            color: root.btConnected ? root.accent : root.quiet
+            dim: root.btOn ? 1 : 0.45
+            Hint { text: "T" }
+          }
+          StatusLight {
+            text: root.micMuted ? "󰍭" : "󰍬"
+            color: root.micInUse ? root.accent : root.quiet
+            dim: root.micInUse ? 1 : 0.45
+            onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
+            Hint { text: "M" }
+          }
+          // Agents: plain for now, like the other lights at rest: quiet at
+          // 60%, always. Running and limits show in the agents panel and in
+          // status until model activity gets its own design.
+          StatusLight {
+            target: "omarchy.agents"
+            text: "\udb81\ude74"
+            color: root.quiet
+            dim: 0.6
+            Hint { text: "A" }
           }
         }
         // One glow for the joined pair, the gap between them included.

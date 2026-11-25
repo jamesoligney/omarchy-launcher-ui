@@ -72,10 +72,11 @@ gap                      = 2
 # Rounded square rather than pill: about 30% of the 44 height.
 # One radius for islands, toasts, notifications and attached panels.
 radius                   = 13
-# Space inside the ends, and between elements (Stage 11: overshoot on
-# purpose, to pull back to taste).
-padding-x                = 44
-spacing                  = 48
+# Space inside the ends, and between elements, for every island (the
+# status island too). Stage 16: pulled back a little from the 44 / 48
+# overshoot.
+padding-x                = 36
+spacing                  = 38
 # Faint static accent glow around every island-language outline (islands,
 # toasts, notifications, attached panels): alpha 0 turns it off; blur px.
 glow-alpha               = 0.32
@@ -93,13 +94,6 @@ glyph-size               = 20
 quiet-alpha              = 0.72
 # Widest the focused app's name may get before it elides.
 app-max-width            = 200
-
-[status]
-# The status island (Wi-Fi, Bluetooth, mic, agents): small lights in one
-# row. Icon size, x step between lights, and the island's own end padding.
-icon-size                = 13
-step                     = 20
-padding-x                = 16
 
 [battery]
 # Percent. On battery, the number turns amber at low and red at critical
