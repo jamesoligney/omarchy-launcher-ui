@@ -12,6 +12,7 @@ import "Security.js" as Security
 import "Delivery.js" as Delivery
 import "Store.js" as Store
 import "Icons.js" as Icons
+import "../jimmy.shared"
 import "../jimmy.shared/Tokens.js" as Tokens
 
 Item {
@@ -230,6 +231,7 @@ Item {
     color: Util.alpha(Commons.Color.background, Tokens.num(Commons.Color.shellValues, "launcher.panel-background-alpha", 0.70))
     borderSpec: Border.surfaceSpec("launcher", "panel-border",
       Util.alpha(Commons.Color.accent, Tokens.num(Commons.Color.shellValues, "launcher.panel-border-alpha", 0.16)), 1)
+    IslandGlow {}
   }
 
   // The keyboard's card is tinted with the theme's hover fill, buttons and all.

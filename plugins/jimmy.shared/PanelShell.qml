@@ -80,6 +80,7 @@ PanelWindow {
     color: Util.alpha(Commons.Color.background, Tokens.num(shell.tokens, "launcher.panel-background-alpha", 0.70))
     border.width: 1
     border.color: Util.alpha(Commons.Color.accent, Tokens.num(shell.tokens, "launcher.panel-border-alpha", 0.16))
+    IslandGlow {}
     transform: Scale {
       origin.x: card.width / 2
       origin.y: 0

@@ -117,6 +117,7 @@ Item {
   // leader.hints = false turns the letters (and the band they need) off.
   readonly property bool showHints: Tokens.str(tokens, "leader.hints", "true") !== "false"
   readonly property int hintSize: num("leader.hint-size", 11)
+  readonly property int glowBlur: num("island.glow-blur", 10)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
 
@@ -335,6 +336,7 @@ Item {
     color: root.islandColor
     border.width: 1
     border.color: root.islandBorder
+    IslandGlow {}
     Row {
       id: row
       anchors.verticalCenter: parent.verticalCenter
@@ -486,7 +488,9 @@ Item {
         anchors { top: true; left: true; right: true }
         // Taller than the bar by the leader letters' overhang below the
         // islands; the input region stays the bar itself.
-        implicitHeight: root.barHeight + (root.showHints ? root.hintSize : 0)
+        // Taller than the bar by the larger of the letters' overhang and the
+        // islands' glow, so neither is cut off.
+        implicitHeight: root.barHeight + Math.max(root.showHints ? root.hintSize : 0, root.glowBlur)
         mask: Region { item: barInput }
         Item { id: barInput; width: window.width; height: root.barHeight }
         color: "transparent"

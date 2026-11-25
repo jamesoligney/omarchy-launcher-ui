@@ -23,6 +23,7 @@ Item {
   Component { id: motionComponent; CardMotion {} }
   Component { id: scaleComponent; Scale {} }
   Component { id: blankComponent; Item {} }
+  Component { id: glowComponent; IslandGlow {} }
 
   // The stock KeyboardPanel that answers to `key`, searched from the key down.
   function panelFor(key) {
@@ -68,6 +69,7 @@ Item {
       scale.xScale = Qt.binding(function() { return motion.xScale })
       scale.yScale = Qt.binding(function() { return motion.yScale })
       card.transform = [scale]
+      glowComponent.createObject(card)
       motions.set(card, motion)
     }
     card.color = Qt.binding(function() {

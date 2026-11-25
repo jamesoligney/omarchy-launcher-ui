@@ -210,10 +210,10 @@
       "waitingSound": "bell"
     },
     {
-      "baseColor": "rgba(472a14dd)",
+      "baseColor": "rgba(184714dd)",
       "gradient": [
-        "rgba(ffc48aee)",
-        "rgba(ff5a1f00)"
+        "rgba(8cff8aee)",
+        "rgba(57ff1f00)"
       ],
       "gradientPositions": "0 99",
       "id": "wmfeht.border-fx",

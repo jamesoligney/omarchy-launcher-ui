@@ -4,7 +4,7 @@
 [bar]
 size-horizontal = 32
 # Total top reserve while jimmy.bar is active (notch.height included).
-height                   = 44
+height                   = 48
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
@@ -67,15 +67,20 @@ corner-inset             = 18
 
 
 [island]
-# gap: space above and below each island inside bar.height (40 tall at 2).
+# gap: space above and below each island inside bar.height (44 tall at 2 in 48).
 gap                      = 2
-# Rounded square rather than pill (window radius is larger).
-radius                   = 9
+# Rounded square rather than pill: 9 too square, 14 too pill.
+# One radius for islands, toasts, notifications and attached panels.
+radius                   = 11
 # Space inside the ends, and between elements (Stage 9: wider again).
 padding-x                = 26
 spacing                  = 28
+# Faint static accent glow around every island-language outline (islands,
+# toasts, notifications, attached panels): alpha 0 turns it off; blur px.
+glow-alpha               = 0.14
+glow-blur                = 10
 # Text and glyph size inside the islands.
-font-size                = 19
+font-size                = 21
 # Quiet contract: everything but the active workspace, the app name and
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72

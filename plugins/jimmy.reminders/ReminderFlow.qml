@@ -140,6 +140,7 @@ Item {
       color: Util.alpha(Commons.Color.background, Tokens.num(tokens, "launcher.panel-background-alpha", 0.70))
       borderSpec: Border.surfaceSpec("launcher", "panel-border", Util.alpha(Commons.Color.accent, Tokens.num(tokens, "launcher.panel-border-alpha", 0.16)), 1)
       padding: root.contentMargin
+      IslandGlow {}
       transformOrigin: Item.Top
       transform: Scale {
         origin.x: card.width / 2

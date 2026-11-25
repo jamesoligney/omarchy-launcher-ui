@@ -168,6 +168,7 @@ Item {
       color: Util.alpha(Commons.Color.background, Tokens.num(root.tokens, "launcher.panel-background-alpha", 0.70))
       borderSpec: Border.surfaceSpec("launcher", "panel-border", Util.alpha(Commons.Color.accent, Tokens.num(root.tokens, "launcher.panel-border-alpha", 0.16)), 1)
       radius: Tokens.num(root.tokens, "island.radius", 9)
+      IslandGlow {}
       // Grows out of the island above it.
       transform: Scale {
         origin.x: card.width / 2
