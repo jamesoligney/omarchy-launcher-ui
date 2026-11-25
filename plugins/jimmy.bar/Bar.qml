@@ -56,6 +56,15 @@ Item {
   readonly property real nearLimit: num("agents.near-limit", 0.85)
   readonly property int fullscreenDebounce: num("fullscreen.debounce-ms", 50)
   readonly property string clockFormat: Tokens.str(tokens, "clock.format", "h:mm")
+  // Qt reads "h" as 0-23 unless the format also has AP. So a format without
+  // AP is formatted with one (12-hour) and the AM/PM text dropped again:
+  // "h:mm" gives 1:05, never 13:05. "HH:mm" stays 24-hour; a format with AP
+  // keeps it.
+  function clockText(date) {
+    var f = root.clockFormat
+    if (/ap/i.test(f) || f.indexOf("H") >= 0) return Qt.formatTime(date, f)
+    return Qt.formatTime(date, f + " AP").replace(/\s*\S+$/, "")
+  }
   readonly property var agentIds: Tokens.str(tokens, "agents.ids", "claude,opencode,grok").split(",").map(function(s) { return s.trim() }).filter(function(s) { return s !== "" })
   readonly property int islandHeight: barHeight - 2 * islandGap
 
@@ -81,6 +90,7 @@ Item {
   readonly property bool pluggedIn: !UPower.onBattery
   // Sparks fired since start (status only: proves they run while charging).
   property int sparks: 0
+  property var sparkSides: ({})
   // Low on battery: amber, mixed from the theme's accent toward its urgent
   // red (battery.low-mix), so it reads apart from the plugged-in accent.
   readonly property color lowTone: Qt.tint(root.accent, Util.alpha(root.urgent, num("battery.low-mix", 0.45)))
@@ -215,7 +225,7 @@ Item {
         hosted: Object.keys(root.hosts),
         weather: { panel: !!root.weatherData, icon: root.weatherIcon, state: weatherStaleness.state, age: weatherStaleness.ageText,
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
-        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, sparks: root.sparks },
+        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, sparks: root.sparks, sides: root.sparkSides },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
         agents: { state: root.agentState, running: root.agentRunning,
           peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
@@ -576,7 +586,7 @@ Item {
           Label {
             height: root.islandHeight
             verticalAlignment: Text.AlignVCenter
-            text: Qt.formatTime(clock.date, root.clockFormat)
+            text: root.clockText(clock.date)
             HoverHandler { onHoveredChanged: root.hoverTime = hovered }
             Tap { target: "omarchy.clock" }
             Hint { text: "C" }
@@ -618,7 +628,7 @@ Item {
               : root.quiet
             Tap { target: "omarchy.power" }
             Hint { text: "B" }
-            Sparks { running: root.charging && window.visible; onFired: root.sparks++ }
+            Sparks { running: root.charging && window.visible; onFired: { root.sparks++; root.sparkSides = sides } }
           }
 
           // Contextual lights: never hidden while on. Mic is primary and sits

@@ -71,9 +71,9 @@ corner-inset             = 18
 gap                      = 2
 # Rounded square rather than pill (window radius is larger).
 radius                   = 9
-# Space inside the ends, and between elements (Stage 8: airier again).
-padding-x                = 20
-spacing                  = 22
+# Space inside the ends, and between elements (Stage 9: wider again).
+padding-x                = 26
+spacing                  = 28
 # Text and glyph size inside the islands.
 font-size                = 19
 # Quiet contract: everything but the active workspace, the app name and
@@ -90,12 +90,14 @@ critical                 = 10
 # Amber: the accent mixed this far toward urgent, to read apart from the
 # plugged-in accent.
 low-mix                  = 0.45
-# Sparks while charging: a tiny jagged arc jumps off the number, flickers
-# and is gone, at a random gap between min-ms and max-ms. Length and width
-# in px, life in ms.
-spark-length             = 12
-spark-width              = 1.2
-spark-ms                 = 300
+# Sparks while charging: a small glowing particle with a brief crackle of
+# jagged filaments leaves a random point around the number's edge, drifts
+# outward and fades, at a random gap between min-ms and max-ms. Core and
+# glow diameters and drift in px, life in ms.
+spark-size               = 3
+spark-glow               = 8
+spark-drift              = 9
+spark-ms                 = 650
 spark-min-ms             = 750
 spark-max-ms             = 1500
 
@@ -112,7 +114,8 @@ hint-size                = 12
 hint-nudge               = -1
 
 [clock]
-# Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.
+# Qt time format. "h:mm" = 12-hour with no AM/PM (Q4, closed): 1:05, not
+# 13:05. "HH:mm" for 24-hour; add "AP" to show AM/PM.
 format                   = "h:mm"
 
 [motion]
