@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "../jimmy.shared/AppName.js" as AppName
 
 BarWidget {
   id: root
@@ -14,13 +15,7 @@ BarWidget {
   readonly property string appId: toplevel ? (toplevel.appId || "") : ""
   readonly property string windowTitle: toplevel ? (toplevel.title || "") : ""
   // Friendly app name from the desktop entry; fall back to the app id.
-  readonly property string appName: {
-    if (appId === "") return ""
-    var entry = DesktopEntries.heuristicLookup(appId)
-    if (entry && entry.name) return entry.name
-    var last = appId.split(".").pop()
-    return last.charAt(0).toUpperCase() + last.slice(1)
-  }
+  readonly property string appName: AppName.resolve(appId, function(id) { return DesktopEntries.heuristicLookup(id) })
   // Tooltip / fallback text.
   readonly property string title: appName !== "" && windowTitle !== "" && windowTitle !== appName
     ? appName + " \u2014 " + windowTitle : (windowTitle || appName)

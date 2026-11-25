@@ -1,12 +1,13 @@
 {
   "bar": {
     "background": "glassy",
+    "id": "jimmy.bar",
     "layout": {
       "center": [
         {
-          "id": "omarchy.clock",
           "format": "ddd d MMM h:mm AP",
           "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
         }
       ],
@@ -49,6 +50,9 @@
       "right": [
         {
           "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.cwilliams5.locus"
         },
         {
           "id": "omarchy.agents"
@@ -202,6 +206,12 @@
       "waitingSound": "bell"
     },
     {
+      "baseColor": "rgba(472a14dd)",
+      "gradient": [
+        "rgba(ffc48aee)",
+        "rgba(ff5a1f00)"
+      ],
+      "gradientPositions": "0 99",
       "id": "wmfeht.border-fx",
       "lobe": 0.3,
       "mirror": true,
@@ -209,13 +219,7 @@
       "shimmerDeg": 35,
       "shimmerHz": 0.45,
       "shimmerScaleMax": 1.45,
-      "shimmerScaleMin": 0.75,
-      "gradient": [
-        "rgba(ff3437ee)",
-        "rgba(df003800)"
-      ],
-      "gradientPositions": "0 99",
-      "baseColor": "rgba(470409dd)"
+      "shimmerScaleMin": 0.75
     },
     {
       "clock12": true,
@@ -238,6 +242,9 @@
     },
     {
       "id": "jimmy.battery"
+    },
+    {
+      "id": "jimmy.notch-ruler"
     }
   ],
   "version": 1

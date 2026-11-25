@@ -7,7 +7,7 @@
 require("default.hypr.glass")()
 
 hl.layer_rule({
-  match = { namespace = "^(omarchy-menu|omarchy-emojis|omarchy-clipboard)$" },
+  match = { namespace = "^(omarchy-menu|omarchy-emojis|omarchy-clipboard|jimmy-bar)$" },
   blur = true,
   ignore_alpha = 0.2,
 })

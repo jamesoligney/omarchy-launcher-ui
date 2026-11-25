@@ -32,7 +32,7 @@ Item {
       motion.hide()
     }
   }
-  Timer { id: closeTimer; interval: 115; onTriggered: root.closing = false }
+  Timer { id: closeTimer; interval: motion.closeHoldMs; onTriggered: root.closing = false }
   // While an app is dragged out toward the dock, the grid steps aside so the
   // dock shows through, and the app's icon follows the pointer. The grid keeps
   // the pointer for as long as the button is held, and tells the dock where it

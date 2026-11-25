@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "jimmy.notch-ruler",
+  "name": "Notch ruler",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Calibration overlay: a centred ruler and corner guides across the top strip, to read the notch width and corner radius by eye",
+  "kinds": [
+    "overlay"
+  ],
+  "entryPoints": {
+    "overlay": "Ruler.qml"
+  }
+}

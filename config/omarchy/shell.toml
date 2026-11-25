@@ -45,3 +45,59 @@ name-weight              = 500
 subtitle-size            = 11
 hint-size                = 13
 hint-font                = "JetBrainsMono Nerd Font"
+
+# ---------------------------------------------------------------------------
+# Top bar restructure (jimmy.bar), frozen in Stage 0, 2026-11-25. Sizes are
+# logical px. Code reads these; there are no literals for them in QML.
+
+[notch]
+# Camera cutout on eDP-1. height: 64 physical rows from
+# /usr/share/omarchy-platform/display-cutouts.json = 32 logical (also the
+# monitor reserve in hypr/monitors.lua). width: 348 physical columns = 174,
+# the value notch-bar calibrated by eye for the same camera module;
+# provisional until read off the Stage 1 ruler.
+height                   = 32
+width                    = 174
+# Clear space between an island and the notch edge.
+inset                    = 10
+# Keep content clear of the display's rounded top corners.
+corner-inset             = 18
+
+[bar]
+# Total top reserve while jimmy.bar is active (notch.height included).
+height                   = 44
+
+[island]
+# gap: space above and below each island inside bar.height.
+gap                      = 6
+radius                   = 14
+padding-x                = 12
+spacing                  = 12
+# Widest the focused app's name may get before it elides.
+app-max-width            = 200
+
+[battery]
+# Percent. low tints the battery bar; critical tints it urgent and is the
+# low-battery notification threshold (jimmy.battery).
+low                      = 20
+critical                 = 10
+# The battery progress bar.
+bar-width                = 26
+bar-height               = 9
+
+[clock]
+# Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.
+format                   = "h:mm"
+
+[motion]
+# jimmy.shared/CardMotion: open springs (X leads, Y lags), fade, close.
+x-from                   = 0.80
+x-omega                  = 24
+x-zeta                   = 0.40
+y-from                   = 0.70
+y-omega                  = 20
+y-zeta                   = 0.46
+fade-ms                  = 160
+settle-ms                = 700
+close-ms                 = 100
+close-scale              = 0.97

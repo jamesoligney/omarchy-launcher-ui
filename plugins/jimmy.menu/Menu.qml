@@ -1382,7 +1382,7 @@ Item {
   // leaves a few milliseconds of headroom before the layer is hidden.
   Timer {
     id: closeTimer
-    interval: 115
+    interval: motion.closeHoldMs
     repeat: false
     onTriggered: root.closing = false
   }

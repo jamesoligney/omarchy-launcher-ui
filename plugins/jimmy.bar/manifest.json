@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "jimmy.bar",
+  "name": "Islands bar",
+  "version": "0.2.0",
+  "author": "Omarchy",
+  "description": "Top bar as two islands either side of the notch (bar restructure, Stage 2 mock)",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

@@ -32,7 +32,7 @@ Item {
       motion.hide()
     }
   }
-  Timer { id: closeTimer; interval: 115; onTriggered: root.closing = false }
+  Timer { id: closeTimer; interval: motion.closeHoldMs; onTriggered: root.closing = false }
   property string filterText: ""
   property string selectedCategory: "all"
   // "All" is a chip of its own: Alt (Option) +1 All, +2..9 the categories, +0 the tenth.

@@ -5,6 +5,7 @@ import Quickshell.Services.UPower
 import qs.Commons
 import "BatteryModel.js" as BatteryModel
 import "../jimmy.shared"
+import "../jimmy.shared/Tokens.js" as Tokens
 
 Item {
   id: root
@@ -12,7 +13,8 @@ Item {
   property var shell: null
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
 
-  readonly property int batteryThreshold: 10
+  // [battery] critical in shell.toml; 10 if unset.
+  readonly property int batteryThreshold: Tokens.num(Color.shellValues, "battery.critical", 10)
   property string pendingPowerSource: ""
   // Follows power-profiles-daemon's change signals, so nothing polls it.
   // Quickshell never attaches that listener if the daemon failed when the
