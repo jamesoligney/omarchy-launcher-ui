@@ -90,6 +90,23 @@ critical                 = 10
 # Amber: the accent mixed this far toward urgent, to read apart from the
 # plugged-in accent.
 low-mix                  = 0.45
+# Embers while charging: a small accent spark floats up off the number and
+# fades, at a random gap between min-ms and max-ms. Size and rise in px.
+ember-size               = 3
+ember-rise               = 16
+ember-ms                 = 1100
+ember-min-ms             = 750
+ember-max-ms             = 1500
+
+[quick]
+# The quick-toggles strip sliding out left of the right island, ms.
+slide-ms                 = 160
+
+[leader]
+# Leader letters on the islands' bottom outline: size, and an optical nudge
+# (px, negative = up) so the edge crosses the middle of a capital.
+hint-size                = 11
+hint-nudge               = -1
 
 [clock]
 # Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.

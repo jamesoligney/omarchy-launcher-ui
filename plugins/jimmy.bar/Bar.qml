@@ -79,6 +79,8 @@ Item {
     || battery.state === UPowerDeviceState.PendingCharge) : false
   // Plugged in (charging, or held at its charge limit): the number turns accent.
   readonly property bool pluggedIn: !UPower.onBattery
+  // Embers fired since start (status only: proves they run while charging).
+  property int embers: 0
   // Low on battery: amber, mixed from the theme's accent toward its urgent
   // red (battery.low-mix), so it reads apart from the plugged-in accent.
   readonly property color lowTone: Qt.tint(root.accent, Util.alpha(root.urgent, num("battery.low-mix", 0.45)))
@@ -102,6 +104,9 @@ Item {
   // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
   // every element shows its letter.
   property bool leaderActive: false
+  readonly property int hintSize: num("leader.hint-size", 11)
+  // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
+  readonly property real hintNudge: num("leader.hint-nudge", -1)
 
   // Weather: the hosted stock weather widget fetches (stock source and
   // interval); the island reads its loaded panel.
@@ -208,7 +213,7 @@ Item {
         hosted: Object.keys(root.hosts),
         weather: { panel: !!root.weatherData, icon: root.weatherIcon, state: weatherStaleness.state, age: weatherStaleness.ageText,
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
-        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn },
+        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, embers: root.embers },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
         agents: { state: root.agentState, running: root.agentRunning,
           peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
@@ -318,7 +323,6 @@ Item {
     color: root.islandColor
     border.width: 1
     border.color: root.islandBorder
-    clip: true
     Row {
       id: row
       anchors.verticalCenter: parent.verticalCenter
@@ -336,26 +340,19 @@ Item {
     textFormat: Text.PlainText
   }
 
-  // The leader key for an element: a small translucent badge centred over
-  // the icon or number it belongs to, only while the leader is active.
-  component Hint: Rectangle {
-    property string text: ""
+  // The leader key for an element: a small letter centred on the island's
+  // bottom outline under the element, so the edge cuts through it. Same line
+  // for every element; only while the leader is active. The parent must be
+  // vertically centred on the island (every island element is).
+  component Hint: Text {
     visible: root.leaderActive && text !== ""
-    anchors.centerIn: parent
+    anchors.horizontalCenter: parent.horizontalCenter
+    y: Math.round((root.islandHeight + parent.height) / 2 - height / 2 + root.hintNudge)
     z: 10
-    width: Math.max(height, hintText.implicitWidth + 8)
-    height: 15
-    radius: 4
-    color: Util.alpha(root.accent, 0.62)
-    Text {
-      id: hintText
-      anchors.centerIn: parent
-      text: parent.text
-      color: Commons.Color.background
-      font.family: root.fontFamily
-      font.pixelSize: 10
-      font.features: { "tnum": 1 }
-    }
+    color: root.accent
+    font.family: root.fontFamily
+    font.pixelSize: root.hintSize
+    font.features: { "tnum": 1 }
   }
 
   component Light: Label {
@@ -374,8 +371,9 @@ Item {
 
   // ------------------------------------------------- quick toggles strip
   // The stock pop-out, in the island language: hovering the time slides the
-  // icons out to its left, inside the right island. Icons only, grey when
-  // off, accent when on; a lit one stays in the bar until clicked off.
+  // icons out to the left of the right island, outside it, so the island
+  // never moves. Icons only, grey when off, accent when on; a lit one stays
+  // in the bar beside the island until clicked off.
   // Q (Super+Ctrl+Q, or Super+D then Q) opens the same strip with focus:
   // Left/Right, Enter, Esc. The calendar drops below the island, so the two
   // never meet. Items: the stock list minus passwordless sudo and screen
@@ -388,8 +386,12 @@ Item {
   ]
   property bool quickOpen: false
   property bool quickKeyboard: false
-  property bool quickHovered: false
+  property bool hoverTime: false
+  property bool hoverStrip: false
+  readonly property bool quickHovered: hoverTime || hoverStrip
+  onQuickHoveredChanged: quickHoverTimer.restart()
   property int quickIndex: 0
+  readonly property int quickSlideMs: num("quick.slide-ms", 160)
 
   function runQuick(key) {
     if (key === "stay") root.toggleStayAwake()
@@ -406,7 +408,6 @@ Item {
     root.quickOpen = true
   }
   function closeQuick() { root.quickOpen = false; root.quickKeyboard = false }
-  function hoverQuick(inside) { root.quickHovered = inside; quickHoverTimer.restart() }
   Timer {
     id: quickHoverTimer
     interval: root.quickOpen ? 300 : 180
@@ -471,7 +472,11 @@ Item {
         readonly property var monitor: screenScope.monitor
 
         anchors { top: true; left: true; right: true }
-        implicitHeight: root.barHeight
+        // Taller than the bar by the leader letters' overhang below the
+        // islands; the input region stays the bar itself.
+        implicitHeight: root.barHeight + root.hintSize
+        mask: Region { item: barInput }
+        Item { id: barInput; width: window.width; height: root.barHeight }
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "jimmy-bar"
@@ -561,78 +566,18 @@ Item {
 
         // --------------------------------------------------- right island
         Island {
+          id: rightIsland
           centerX: window.ears.rightCenter
           maxWidth: window.ears.maxIslandWidth
 
-          // The quick-toggles strip and the time: one hover zone. The strip
-          // slides out to the left of the time; lit items stay in the bar.
-          Item {
-            id: timeZone
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: timeRow.implicitWidth
-            implicitHeight: root.islandHeight
-            HoverHandler { onHoveredChanged: root.hoverQuick(hovered) }
-            Row {
-              id: timeRow
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: root.islandSpacing
-              Item {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: stripRow.visibleChildren.length > 0
-                implicitWidth: stripRow.implicitWidth
-                implicitHeight: root.islandHeight
-                Row {
-                  id: stripRow
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: root.islandSpacing
-                  Repeater {
-                    model: root.quickItems
-                    Item {
-                      required property var modelData
-                      required property int index
-                      readonly property bool current: root.quickKeyboard && index === root.quickIndex
-                      visible: root.quickOpen || root.leaderActive || modelData.on
-                      anchors.verticalCenter: parent.verticalCenter
-                      implicitWidth: icon.implicitWidth
-                      implicitHeight: root.islandHeight - 8
-                      Rectangle {
-                        visible: parent.current
-                        anchors.centerIn: parent
-                        width: icon.implicitWidth + 10
-                        height: parent.height
-                        radius: root.islandRadius - 3
-                        color: "transparent"
-                        border.width: 1
-                        border.color: root.accent
-                      }
-                      Label {
-                        id: icon
-                        anchors.centerIn: parent
-                        text: modelData.icon
-                        font.family: root.iconFamily
-                        color: modelData.on ? root.accent : root.quiet
-                        opacity: modelData.on ? 1 : 0.45
-                      }
-                      MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.runQuick(modelData.key)
-                      }
-                      // Q sits on stay awake: the strip's anchor, nearest the time.
-                      Hint { text: index === root.quickItems.length - 1 ? "Q" : "" }
-                    }
-                  }
-                }
-              }
-              // Time, nearest the notch. Click: calendar.
-              Label {
-                height: root.islandHeight
-                verticalAlignment: Text.AlignVCenter
-                text: Qt.formatTime(clock.date, root.clockFormat)
-                Tap { target: "omarchy.clock" }
-                Hint { text: "C" }
-              }
-            }
+          // Time, nearest the notch. Click: calendar. Hover: the quick strip.
+          Label {
+            height: root.islandHeight
+            verticalAlignment: Text.AlignVCenter
+            text: Qt.formatTime(clock.date, root.clockFormat)
+            HoverHandler { onHoveredChanged: root.hoverTime = hovered }
+            Tap { target: "omarchy.clock" }
+            Hint { text: "C" }
           }
 
           // Weather, icon only. Fresh / stale (dim) / offline (dim + mark).
@@ -671,6 +616,7 @@ Item {
               : root.quiet
             Tap { target: "omarchy.power" }
             Hint { text: "B" }
+            Embers { running: root.charging && window.visible; onFired: root.embers++ }
           }
 
           // Contextual lights: never hidden while on. Mic is primary and sits
@@ -705,6 +651,74 @@ Item {
             opacity: root.agentState === "idle" ? 0.6 : 1
             Tap { target: "omarchy.agents" }
             Hint { text: "A" }
+          }
+        }
+
+        // Quick strip: outside the island, its right edge on the island's left
+        // edge, so opening it never moves the island. Items grow from zero
+        // width (slide out leftward); the zone reaches over the island's
+        // padding to the time, so the pointer never crosses a gap.
+        Item {
+          x: rightIsland.x - stripRow.width
+          y: root.islandGap
+          width: stripRow.width + root.islandPadding
+          height: root.islandHeight
+          HoverHandler { onHoveredChanged: root.hoverStrip = hovered }
+          Row {
+            id: stripRow
+            height: parent.height
+            Repeater {
+              model: root.quickItems
+              Item {
+                required property var modelData
+                required property int index
+                readonly property bool shown: root.quickOpen || modelData.on
+                readonly property bool current: root.quickKeyboard && index === root.quickIndex
+                width: shown ? icon.implicitWidth + root.islandSpacing : 0
+                height: parent.height
+                clip: true
+                opacity: shown ? 1 : 0
+                Behavior on width { NumberAnimation { duration: root.quickSlideMs; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: root.quickSlideMs } }
+                Rectangle {
+                  visible: parent.current
+                  anchors.centerIn: icon
+                  width: icon.implicitWidth + 10
+                  height: root.islandHeight - 8
+                  radius: root.islandRadius - 3
+                  color: "transparent"
+                  border.width: 1
+                  border.color: root.accent
+                }
+                Label {
+                  id: icon
+                  x: root.islandSpacing / 2
+                  text: modelData.icon
+                  font.family: root.iconFamily
+                  color: modelData.on ? root.accent : root.quiet
+                  opacity: modelData.on ? 1 : 0.45
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.runQuick(modelData.key)
+                }
+              }
+            }
+          }
+          // Q: on stay awake's place (last, nearest the island), whether or
+          // not it is showing; same line as every other letter.
+          Item {
+            x: stripRow.width - width - root.islandSpacing / 2
+            width: stayMetrics.advanceWidth
+            height: parent.height
+            Hint { text: "Q" }
+          }
+          TextMetrics {
+            id: stayMetrics
+            font.family: root.iconFamily
+            font.pixelSize: root.fontSize
+            text: root.quickItems[root.quickItems.length - 1].icon
           }
         }
 
