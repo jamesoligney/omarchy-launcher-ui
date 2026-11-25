@@ -12,6 +12,40 @@ local size = { o.float_default.width, o.float_default.height }
 -- match; dialogs an app floats itself keep the size the app asks for.
 o.window({ tag = "floating-window" }, { size = size, center = true })
 
+-- Floating is the default on every workspace (Stage 19): every new window
+-- opens floating at the default size, centred; tiling is the opt-in (Super+T).
+-- Left alone: modal dialogs and windows Hyprland already floats (transient
+-- dialogs, popups), which keep the size their app asks for, and apps with
+-- float rules of their own (Omarchy's o.floating_apps: About, the
+-- calculator...), which keep theirs. Rules apply as a window opens, so
+-- windows already open are never moved.
+local function own_floaters(list)
+  local alternatives = {}
+  for _, pattern in ipairs(list) do table.insert(alternatives, "(?:" .. pattern .. ")") end
+  return #alternatives > 0 and "negative:" .. table.concat(alternatives, "|") or nil
+end
+o.window({
+  float = false,
+  modal = false,
+  class = own_floaters(o.floating_apps.class),
+  title = own_floaters(o.floating_apps.title),
+}, { float = true, size = size, center = true })
+
+-- On a workspace in Omarchy's floating mode (Super+L) the mode's own open
+-- rule is registered at runtime, after this one, so it would win (its stock
+-- size and a cascade). The default wins there too: a window that rule opened
+-- (it carries the rule's tag) is set to the default size, centred.
+hl.on("window.open", function(window)
+  for _, tag in ipairs(window.tags or {}) do
+    if tag == "omarchy-mode-opened*" or tag == "omarchy-mode-opened" then
+      local target = "address:" .. window.address
+      hl.dispatch(hl.dsp.window.resize({ x = size[1], y = size[2], relative = false, window = target }))
+      hl.dispatch(hl.dsp.window.center({ window = target }))
+      return
+    end
+  end
+end)
+
 -- Super+T (bindings.lua): floating a window gives it the default size,
 -- centred, the first time; after that it returns to the floating size and
 -- place it last had (Hyprland keeps the size but not the place), so a
