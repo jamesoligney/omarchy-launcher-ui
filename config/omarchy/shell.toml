@@ -93,12 +93,10 @@ quiet-alpha              = 0.72
 app-max-width            = 200
 
 [status]
-# The status island (Wi-Fi, Bluetooth, mic): small lights on two staggered
-# rows. Icon size, x step between lights, each row's offset from the middle,
-# and the island's own end padding.
+# The status island (Wi-Fi, Bluetooth, mic, agents): small lights in one
+# row. Icon size, x step between lights, and the island's own end padding.
 icon-size                = 13
-step                     = 15
-stagger                  = 6
+step                     = 20
 padding-x                = 16
 
 [battery]

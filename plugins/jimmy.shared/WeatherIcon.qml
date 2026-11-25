@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Shapes
 import "WeatherIcons.js" as WeatherIcons
 
-// One weather icon from WeatherIcons.js, stroked on its 24 grid and scaled to
-// `size`, in `color`. Grayscale by design: the island passes its quiet ink.
+// One weather glyph from WeatherIcons.js, filled on its 24 grid and scaled to
+// `size`, in `color` (grayscale by design: callers pass their quiet ink).
+// Shared by the bar's island and the weather panel.
 Item {
   id: icon
   property string key: ""
@@ -18,11 +19,10 @@ Item {
     transformOrigin: Item.TopLeft
     preferredRendererType: Shape.CurveRenderer
     ShapePath {
-      strokeColor: icon.color
-      strokeWidth: 2
-      fillColor: "transparent"
-      capStyle: ShapePath.RoundCap
-      joinStyle: ShapePath.RoundJoin
+      strokeColor: "transparent"
+      strokeWidth: 0
+      fillColor: icon.color
+      fillRule: ShapePath.OddEvenFill
       PathSvg { path: WeatherIcons.paths[icon.key] || "" }
     }
   }

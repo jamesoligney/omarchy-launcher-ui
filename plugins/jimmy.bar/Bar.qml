@@ -14,7 +14,7 @@ import "../jimmy.shared/Tokens.js" as Tokens
 import "../jimmy.shared/AppName.js" as AppName
 import "../jimmy.shared/BarGeometry.js" as BarGeometry
 // The stock weather glyph set (9 conditions, day/night), reused as-is.
-import "WeatherIcons.js" as WeatherIcons
+import "../jimmy.shared/WeatherIcons.js" as WeatherIcons
 import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkModel
 
 // Islands bar, Stage 3: islands live.
@@ -159,8 +159,7 @@ Item {
   readonly property int jointGap: num("island.joint-gap", 4)
   readonly property int jointRadius: num("island.joint-radius", 2)
   readonly property int statusSize: num("status.icon-size", 13)
-  readonly property int statusStep: num("status.step", 15)
-  readonly property int statusStagger: num("status.stagger", 6)
+  readonly property int statusStep: num("status.step", 20)
   readonly property int statusPadding: num("status.padding-x", 16)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
@@ -287,8 +286,12 @@ Item {
 
   // --------------------------------------------------- hosted panel widgets
   readonly property var hostIds: ["omarchy.audio", "omarchy.bluetooth", "omarchy.network", "omarchy.power",
-    "omarchy.monitor", "omarchy.clock", "omarchy.weather", "omarchy.agents", "omarchy.microphone",
+    "omarchy.monitor", "omarchy.clock", root.weatherId, "omarchy.agents", "omarchy.microphone",
     "io.github.cwilliams5.locus"]
+  // Weather: the user clone (jimmy.weather: the bar's own icon set in its
+  // panel) when installed, else stock. Either way it also answers to
+  // "omarchy.weather", so leader W and `shell toggle omarchy.weather` work.
+  readonly property string weatherId: barWidgetRegistry && barWidgetRegistry.widgets["jimmy.weather"] ? "jimmy.weather" : "omarchy.weather"
   // Panels for the status island's lights drop from the status island.
   readonly property var statusHostIds: ["omarchy.network", "omarchy.bluetooth", "omarchy.microphone", "omarchy.agents"]
   property var hosts: ({})
@@ -404,9 +407,9 @@ Item {
     }
   }
 
-  // A status light in the status island: small, on one of two staggered
-  // rows (even slots up, odd down), step px apart. The item spans the
-  // island's height so its leader letter lands on the outline like the rest.
+  // A status light in the status island: small, in one row, step px apart,
+  // centred in the island. The item spans the island's height so its leader
+  // letter lands on the outline like the rest.
   component StatusLight: Item {
     property int slot: 0
     property alias text: glyph.text
@@ -419,7 +422,7 @@ Item {
     height: root.islandHeight
     Text {
       id: glyph
-      y: Math.round(parent.height / 2 - height / 2 + (parent.slot % 2 ? root.statusStagger : -root.statusStagger))
+      y: Math.round(parent.height / 2 - height / 2)
       font.family: root.iconFamily
       font.pixelSize: root.statusSize
       textFormat: Text.PlainText
@@ -739,8 +742,8 @@ Item {
         }
 
         // ------------------------------------------------- status island
-        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, small and staggered
-        // on two rows. Joined to the right island across island.joint-gap,
+        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, small, in
+        // one row. Joined to the right island across island.joint-gap,
         // the facing corners square, so the two read as one island divided;
         // the right island keeps its centre in the ear, this one hangs off
         // its right. Room for more lights: each adds statusStep px.
@@ -779,17 +782,16 @@ Item {
               onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
               Hint { text: "M" }
             }
-            // Agents: calm at rest; red over a limit, accent near one, full
-            // while an agent window runs.
+            // Agents: no alarm colour. Accent while an agent window runs,
+            // whatever the limits say; otherwise quiet at 60%. Limits stay
+            // in the agents panel and in status.
             StatusLight {
               id: agentsLight
               slot: 3
               target: "omarchy.agents"
               text: "\udb81\ude74"
-              color: root.agentState === "over" ? root.urgent
-                : root.agentState === "near" ? root.accent
-                : root.agentState === "running" ? root.ink : root.quiet
-              dim: root.agentState === "idle" ? 0.6 : 1
+              color: root.agentRunning ? root.accent : root.quiet
+              dim: root.agentRunning ? 1 : 0.6
               Hint { text: "A" }
             }
           }
@@ -906,9 +908,10 @@ Item {
           if ("bar" in item) item.bar = root.apiFor(modelData)
           if ("moduleName" in item) item.moduleName = modelData
           if ("settings" in item) item.settings = root.entrySettings(modelData)
-          if (modelData === "omarchy.weather") root.weatherLoader = root.loaderIn(item)
+          if (modelData === root.weatherId) root.weatherLoader = root.loaderIn(item)
           var next = Object.assign({}, root.hosts)
           next[modelData] = item
+          if (modelData === root.weatherId) next["omarchy.weather"] = item
           root.hosts = next
         }
       }
