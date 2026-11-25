@@ -55,6 +55,8 @@ Item {
   // island.glyph-size). The status island's lights have their own size.
   readonly property int textSize: num("island.text-size", 18)
   readonly property int glyphSize: num("island.glyph-size", 20)
+  readonly property int statusPadding: num("status.padding-x", 18)
+  readonly property int statusSpacing: num("status.spacing", 20)
   readonly property real quietAlpha: num("island.quiet-alpha", 0.72)
   readonly property int appMaxWidth: num("island.app-max-width", 200)
   readonly property int batteryLow: num("battery.low", 20)
@@ -383,6 +385,7 @@ Item {
     property real centerX: 0
     property int maxWidth: 10000
     property int padding: root.islandPadding
+    property int gap: root.islandSpacing
     property bool joinLeft: false
     property bool joinRight: false
     property bool glow: true
@@ -403,7 +406,7 @@ Item {
       id: row
       anchors.verticalCenter: parent.verticalCenter
       x: parent.padding
-      spacing: root.islandSpacing
+      spacing: parent.gap
     }
   }
 
@@ -742,14 +745,17 @@ Item {
         }
 
         // ------------------------------------------------- status island
-        // Wi-Fi, Bluetooth, mic, agents: persistent status lights, the same
-        // size, padding and spacing as every island element. Joined to the
+        // Wi-Fi, Bluetooth, mic, agents: persistent status lights at the
+        // glyph size, with the status island's own tighter padding and
+        // spacing (a secondary island stays narrower than the main one). Joined to the
         // right island across island.joint-gap, the facing corners square,
         // so the two read as one island divided; the right island keeps its
         // centre in the ear, this one hangs off its right.
         Island {
           id: statusIsland
           x: rightIsland.x + rightIsland.width + root.jointGap
+          padding: root.statusPadding
+          gap: root.statusSpacing
           joinLeft: true
           glow: false
           StatusLight {

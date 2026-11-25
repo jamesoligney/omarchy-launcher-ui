@@ -95,6 +95,12 @@ quiet-alpha              = 0.72
 # Widest the focused app's name may get before it elides.
 app-max-width            = 200
 
+[status]
+# The status island's own padding and spacing (tighter than the main
+# islands: it is secondary and stays narrower). Glyphs use island.glyph-size.
+padding-x                = 18
+spacing                  = 20
+
 [battery]
 # Percent. On battery, the number turns amber at low and red at critical
 # (critical is also the low-battery notification threshold, jimmy.battery).
@@ -127,9 +133,10 @@ hint-size                = 12
 hint-nudge               = -1
 
 [clock]
-# Qt time format. "h:mm" = 12-hour with no AM/PM (Q4, closed): 1:05, not
-# 13:05. "HH:mm" for 24-hour; add "AP" to show AM/PM.
-format                   = "h:mm"
+# Qt time format. "h:mm AP" = 12-hour with AM/PM (Stage 17 reverses Q4):
+# 2:38 PM, 9:04 AM. Qt reads "h" as 24-hour unless the format has AP;
+# without AP the bar still forces 12-hour and drops the marker.
+format                   = "h:mm AP"
 
 [motion]
 # jimmy.shared/CardMotion: open springs (X leads, Y lags), fade, close.
