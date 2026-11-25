@@ -4,6 +4,8 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.UPower
+import Quickshell.Networking
+import Quickshell.Bluetooth
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -13,6 +15,7 @@ import "../jimmy.shared/AppName.js" as AppName
 import "../jimmy.shared/BarGeometry.js" as BarGeometry
 // The stock weather glyph set (9 conditions, day/night), reused as-is.
 import "/usr/share/omarchy/shell/plugins/panels/weather/Model.js" as WeatherModel
+import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkModel
 
 // Islands bar, Stage 3: islands live.
 // Left island (centred in the left ear): workspaces + focused app.
@@ -109,6 +112,41 @@ Item {
   function toggleStayAwake() { if (idleService) idleService.setIdleEnabled(root.stayAwake) }
   function toggleSilence() { if (notificationService) notificationService.setDoNotDisturb(!root.silenced) }
   readonly property bool remoteActive: !!remoteService && remoteService.active === true
+  // Status island. Network: Wi-Fi by signal, ethernet, down (urgent) or
+  // Wi-Fi off (dim). Bluetooth: off (dim), on, or a device connected (accent).
+  readonly property var netDevices: Networking.devices ? Networking.devices.values : []
+  function netDevice(type) {
+    var fallback = null
+    for (var i = 0; i < netDevices.length; i++) {
+      var d = netDevices[i]
+      if (!d || d.type !== type) continue
+      if (d.connected) return d
+      if (!fallback) fallback = d
+    }
+    return fallback
+  }
+  readonly property var wifiDevice: netDevice(DeviceType.Wifi)
+  readonly property var wiredDevice: netDevice(DeviceType.Wired)
+  readonly property var wifiNetwork: {
+    var nets = wifiDevice && wifiDevice.networks ? wifiDevice.networks.values : []
+    for (var i = 0; i < nets.length; i++) if (nets[i] && nets[i].connected) return nets[i]
+    return null
+  }
+  readonly property string netState: wiredDevice && wiredDevice.connected ? "wired"
+    : (wifiNetwork || (wifiDevice && wifiDevice.connected)) ? "wifi"
+    : Networking.wifiEnabled ? "down" : "off"
+  readonly property string netIcon: netState === "wired" ? "󰈀"
+    : netState === "wifi" ? NetworkModel.wifiIconFor(wifiNetwork && wifiNetwork.signalStrength > 0 ? Math.round(wifiNetwork.signalStrength * 100) : 100)
+    : netState === "down" ? "󰤮" : "󰤭"
+  readonly property var btAdapter: Bluetooth.defaultAdapter
+  readonly property bool btOn: !!btAdapter && btAdapter.enabled
+  readonly property bool btConnected: {
+    var ds = btOn && Bluetooth.devices ? Bluetooth.devices.values : []
+    for (var i = 0; i < ds.length; i++) if (ds[i] && ds[i].connected) return true
+    return false
+  }
+  readonly property string btIcon: !btOn ? "󰂲" : btConnected ? "󰂱" : "󰂯"
+  readonly property bool micMuted: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].muted === true
   readonly property bool micInUse: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].inUse === true
   property bool recording: false
   // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
@@ -117,7 +155,13 @@ Item {
   // leader.hints = false turns the letters (and the band they need) off.
   readonly property bool showHints: Tokens.str(tokens, "leader.hints", "true") !== "false"
   readonly property int hintSize: num("leader.hint-size", 11)
-  readonly property int glowBlur: num("island.glow-blur", 10)
+  readonly property int glowBlur: num("island.glow-blur", 20)
+  readonly property int jointGap: num("island.joint-gap", 4)
+  readonly property int jointRadius: num("island.joint-radius", 2)
+  readonly property int statusSize: num("status.icon-size", 13)
+  readonly property int statusStep: num("status.step", 15)
+  readonly property int statusStagger: num("status.stagger", 6)
+  readonly property int statusPadding: num("status.padding-x", 16)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
 
@@ -228,6 +272,7 @@ Item {
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
         battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, sparks: root.sparks, sides: root.sparkSides },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
+        status: { net: root.netState, netIcon: root.netIcon, bluetooth: root.btOn ? (root.btConnected ? "connected" : "on") : "off", micMuted: root.micMuted, micInUse: root.micInUse },
         agents: { state: root.agentState, running: root.agentRunning,
           peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
         leader: root.leaderActive,
@@ -324,24 +369,63 @@ Item {
   }
 
   // ------------------------------------------------------------- pieces
+  // An island. joinLeft / joinRight square the corners on that side to
+  // island.joint-radius, for two islands that read as one divided in two;
+  // such a pair glows as one (glow: false here, see rightPair).
   component Island: Rectangle {
     default property alias content: row.data
     property real centerX: 0
     property int maxWidth: 10000
-    width: Math.min(maxWidth, row.implicitWidth + 2 * root.islandPadding)
+    property int padding: root.islandPadding
+    property bool joinLeft: false
+    property bool joinRight: false
+    property bool glow: true
+    width: Math.min(maxWidth, row.implicitWidth + 2 * padding)
     height: root.islandHeight
     x: Math.round(centerX - width / 2)
     y: root.islandGap
     radius: root.islandRadius
+    topLeftRadius: joinLeft ? root.jointRadius : radius
+    bottomLeftRadius: joinLeft ? root.jointRadius : radius
+    topRightRadius: joinRight ? root.jointRadius : radius
+    bottomRightRadius: joinRight ? root.jointRadius : radius
     color: root.islandColor
     border.width: 1
     border.color: root.islandBorder
-    IslandGlow {}
+    IslandGlow { visible: parent.glow && alpha > 0 }
     Row {
       id: row
       anchors.verticalCenter: parent.verticalCenter
-      x: root.islandPadding
+      x: parent.padding
       spacing: root.islandSpacing
+    }
+  }
+
+  // A status light in the status island: small, on one of two staggered
+  // rows (even slots up, odd down), step px apart. The item spans the
+  // island's height so its leader letter lands on the outline like the rest.
+  component StatusLight: Item {
+    property int slot: 0
+    property alias text: glyph.text
+    property alias color: glyph.color
+    property alias dim: glyph.opacity
+    property string target: ""
+    signal tapped()
+    x: slot * root.statusStep
+    width: glyph.implicitWidth
+    height: root.islandHeight
+    Text {
+      id: glyph
+      y: Math.round(parent.height / 2 - height / 2 + (parent.slot % 2 ? root.statusStagger : -root.statusStagger))
+      font.family: root.iconFamily
+      font.pixelSize: root.statusSize
+      textFormat: Text.PlainText
+    }
+    MouseArea {
+      anchors.fill: glyph
+      anchors.margins: -3
+      cursorShape: Qt.PointingHandCursor
+      onClicked: parent.target ? root.toggleBarWidget(parent.target) : parent.tapped()
     }
   }
 
@@ -585,6 +669,8 @@ Item {
           id: rightIsland
           centerX: window.ears.rightCenter
           maxWidth: window.ears.maxIslandWidth
+          joinRight: true
+          glow: false
 
           // Time, nearest the notch. Click: calendar. Hover: the quick strip.
           Label {
@@ -635,8 +721,8 @@ Item {
             Sparks { running: root.charging && window.visible; onFired: { root.sparks++; root.sparkSides = sides } }
           }
 
-          // Contextual lights: never hidden while on. Mic is primary and sits
-          // rightmost; the others stack to its left.
+          // Contextual lights: only while on (the mic lives in the status
+          // island now, persistent).
           Light { on: root.remoteActive; text: "󰢹"; color: root.urgent }
           Light {
             on: root.recording; text: "󰻂"; color: root.urgent
@@ -644,14 +730,6 @@ Item {
               anchors.fill: parent
               cursorShape: Qt.PointingHandCursor
               onClicked: Quickshell.execDetached(["omarchy-capture-screenrecording", "--stop-recording"])
-            }
-          }
-          Light {
-            on: root.micInUse; text: "󰍬"; color: root.urgent
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
             }
           }
 
@@ -668,6 +746,59 @@ Item {
             Tap { target: "omarchy.agents" }
             Hint { text: "A" }
           }
+        }
+
+        // ------------------------------------------------- status island
+        // Wi-Fi, Bluetooth, mic: persistent status lights, small and staggered
+        // on two rows. Joined to the right island across island.joint-gap,
+        // the facing corners square, so the two read as one island divided;
+        // the right island keeps its centre in the ear, this one hangs off
+        // its right. Room for more lights: each adds statusStep px.
+        Island {
+          id: statusIsland
+          x: rightIsland.x + rightIsland.width + root.jointGap
+          padding: root.statusPadding
+          joinLeft: true
+          glow: false
+          Item {
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: 2 * root.statusStep + micLight.width
+            implicitHeight: root.islandHeight
+            StatusLight {
+              slot: 0
+              target: "omarchy.network"
+              text: root.netIcon
+              color: root.netState === "down" ? root.urgent : root.quiet
+              dim: root.netState === "off" ? 0.45 : 1
+              Hint { text: "N" }
+            }
+            StatusLight {
+              slot: 1
+              target: "omarchy.bluetooth"
+              text: root.btIcon
+              color: root.btConnected ? root.accent : root.quiet
+              dim: root.btOn ? 1 : 0.45
+              Hint { text: "T" }
+            }
+            StatusLight {
+              id: micLight
+              slot: 2
+              text: root.micMuted ? "󰍭" : "󰍬"
+              color: root.micInUse ? root.accent : root.quiet
+              dim: root.micInUse ? 1 : 0.45
+              onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
+              Hint { text: "M" }
+            }
+          }
+        }
+        // One glow for the joined pair, the gap between them included.
+        Item {
+          z: -1
+          x: rightIsland.x
+          y: rightIsland.y
+          width: statusIsland.x + statusIsland.width - rightIsland.x
+          height: rightIsland.height
+          IslandGlow { cutouts: [rightIsland, statusIsland]; radius: root.islandRadius }
         }
 
         // Quick strip: outside the island, its right edge on the island's left

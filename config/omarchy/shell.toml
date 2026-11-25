@@ -69,9 +69,9 @@ corner-inset             = 18
 [island]
 # gap: space above and below each island inside bar.height (44 tall at 2 in 48).
 gap                      = 2
-# Rounded square rather than pill: 9 too square, 14 too pill.
+# Rounded square rather than pill: about 30% of the 44 height.
 # One radius for islands, toasts, notifications and attached panels.
-radius                   = 11
+radius                   = 13
 # Space inside the ends, and between elements (Stage 11: overshoot on
 # purpose, to pull back to taste).
 padding-x                = 44
@@ -80,6 +80,10 @@ spacing                  = 48
 # toasts, notifications, attached panels): alpha 0 turns it off; blur px.
 glow-alpha               = 0.32
 glow-blur                = 20
+# Two islands joined as one divided in two (right + status): the gap between
+# them and the radius of the corners that face each other.
+joint-gap                = 4
+joint-radius             = 2
 # Text and glyph size inside the islands.
 font-size                = 20
 # Quiet contract: everything but the active workspace, the app name and
@@ -87,6 +91,15 @@ font-size                = 20
 quiet-alpha              = 0.72
 # Widest the focused app's name may get before it elides.
 app-max-width            = 200
+
+[status]
+# The status island (Wi-Fi, Bluetooth, mic): small lights on two staggered
+# rows. Icon size, x step between lights, each row's offset from the middle,
+# and the island's own end padding.
+icon-size                = 13
+step                     = 15
+stagger                  = 6
+padding-x                = 16
 
 [battery]
 # Percent. On battery, the number turns amber at low and red at critical
