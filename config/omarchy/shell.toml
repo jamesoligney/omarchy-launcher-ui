@@ -67,15 +67,15 @@ corner-inset             = 18
 
 
 [island]
-# gap: space above and below each island inside bar.height (38 tall at 3).
-gap                      = 3
+# gap: space above and below each island inside bar.height (40 tall at 2).
+gap                      = 2
 # Rounded square rather than pill (window radius is larger).
 radius                   = 9
-# Stage 6: airier. Space inside the ends, and between elements.
-padding-x                = 16
-spacing                  = 18
+# Space inside the ends, and between elements (Stage 8: airier again).
+padding-x                = 20
+spacing                  = 22
 # Text and glyph size inside the islands.
-font-size                = 16
+font-size                = 19
 # Quiet contract: everything but the active workspace, the app name and
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72
@@ -90,22 +90,25 @@ critical                 = 10
 # Amber: the accent mixed this far toward urgent, to read apart from the
 # plugged-in accent.
 low-mix                  = 0.45
-# Embers while charging: a small accent spark floats up off the number and
-# fades, at a random gap between min-ms and max-ms. Size and rise in px.
-ember-size               = 3
-ember-rise               = 16
-ember-ms                 = 1100
-ember-min-ms             = 750
-ember-max-ms             = 1500
+# Sparks while charging: a tiny jagged arc jumps off the number, flickers
+# and is gone, at a random gap between min-ms and max-ms. Length and width
+# in px, life in ms.
+spark-length             = 12
+spark-width              = 1.2
+spark-ms                 = 300
+spark-min-ms             = 750
+spark-max-ms             = 1500
 
 [quick]
 # The quick-toggles strip sliding out left of the right island, ms.
 slide-ms                 = 160
 
 [leader]
+# false turns the leader letters off (the leader keys keep working).
+hints                    = true
 # Leader letters on the islands' bottom outline: size, and an optical nudge
 # (px, negative = up) so the edge crosses the middle of a capital.
-hint-size                = 11
+hint-size                = 12
 hint-nudge               = -1
 
 [clock]

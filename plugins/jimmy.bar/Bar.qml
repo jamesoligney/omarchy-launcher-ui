@@ -79,8 +79,8 @@ Item {
     || battery.state === UPowerDeviceState.PendingCharge) : false
   // Plugged in (charging, or held at its charge limit): the number turns accent.
   readonly property bool pluggedIn: !UPower.onBattery
-  // Embers fired since start (status only: proves they run while charging).
-  property int embers: 0
+  // Sparks fired since start (status only: proves they run while charging).
+  property int sparks: 0
   // Low on battery: amber, mixed from the theme's accent toward its urgent
   // red (battery.low-mix), so it reads apart from the plugged-in accent.
   readonly property color lowTone: Qt.tint(root.accent, Util.alpha(root.urgent, num("battery.low-mix", 0.45)))
@@ -104,6 +104,8 @@ Item {
   // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
   // every element shows its letter.
   property bool leaderActive: false
+  // leader.hints = false turns the letters (and the band they need) off.
+  readonly property bool showHints: Tokens.str(tokens, "leader.hints", "true") !== "false"
   readonly property int hintSize: num("leader.hint-size", 11)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
@@ -213,7 +215,7 @@ Item {
         hosted: Object.keys(root.hosts),
         weather: { panel: !!root.weatherData, icon: root.weatherIcon, state: weatherStaleness.state, age: weatherStaleness.ageText,
           retries: root.weatherData ? [root.weatherData.forecastRetries, root.weatherData.dailyForecastRetries] : null },
-        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, embers: root.embers },
+        battery: { percent: root.batteryPercent, charging: root.charging, pluggedIn: root.pluggedIn, sparks: root.sparks },
         lights: { stayAwake: root.stayAwake, remote: root.remoteActive, recording: root.recording, mic: root.micInUse },
         agents: { state: root.agentState, running: root.agentRunning,
           peaks: Object.keys(root.agentRecords).map(function(id) { return id + " " + root.peakOf(root.agentRecords[id]) }) },
@@ -345,7 +347,7 @@ Item {
   // for every element; only while the leader is active. The parent must be
   // vertically centred on the island (every island element is).
   component Hint: Text {
-    visible: root.leaderActive && text !== ""
+    visible: root.showHints && root.leaderActive && text !== ""
     anchors.horizontalCenter: parent.horizontalCenter
     y: Math.round((root.islandHeight + parent.height) / 2 - height / 2 + root.hintNudge)
     z: 10
@@ -474,7 +476,7 @@ Item {
         anchors { top: true; left: true; right: true }
         // Taller than the bar by the leader letters' overhang below the
         // islands; the input region stays the bar itself.
-        implicitHeight: root.barHeight + root.hintSize
+        implicitHeight: root.barHeight + (root.showHints ? root.hintSize : 0)
         mask: Region { item: barInput }
         Item { id: barInput; width: window.width; height: root.barHeight }
         color: "transparent"
@@ -616,7 +618,7 @@ Item {
               : root.quiet
             Tap { target: "omarchy.power" }
             Hint { text: "B" }
-            Embers { running: root.charging && window.visible; onFired: root.embers++ }
+            Sparks { running: root.charging && window.visible; onFired: root.sparks++ }
           }
 
           // Contextual lights: never hidden while on. Mic is primary and sits
