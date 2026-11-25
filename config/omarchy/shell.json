@@ -117,7 +117,8 @@
     "jimmy.emojis",
     "jimmy.clipboard",
     "jimmy.reminders",
-    "jimmy.battery"
+    "jimmy.battery",
+    "jimmy.osd"
   ],
   "disabledPlugins": [
     "omarchy.lock",
@@ -125,7 +126,8 @@
     "omarchy.emojis",
     "omarchy.clipboard",
     "omarchy.reminders",
-    "omarchy.battery"
+    "omarchy.battery",
+    "omarchy.osd"
   ],
   "dock": {
     "autohide": true,
@@ -245,6 +247,9 @@
     },
     {
       "id": "jimmy.notch-ruler"
+    },
+    {
+      "id": "jimmy.osd"
     }
   ],
   "version": 1

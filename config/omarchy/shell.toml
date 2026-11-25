@@ -3,6 +3,8 @@
 # eDP-1 so top and bottom reserved space are identical (see hypr/monitors.lua).
 [bar]
 size-horizontal = 32
+# Total top reserve while jimmy.bar is active (notch.height included).
+height                   = 44
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
@@ -63,16 +65,19 @@ inset                    = 10
 # Keep content clear of the display's rounded top corners.
 corner-inset             = 18
 
-[bar]
-# Total top reserve while jimmy.bar is active (notch.height included).
-height                   = 44
 
 [island]
-# gap: space above and below each island inside bar.height.
-gap                      = 6
-radius                   = 14
-padding-x                = 12
+# gap: space above and below each island inside bar.height (38 tall at 3).
+gap                      = 3
+# Rounded square rather than pill (window radius is larger).
+radius                   = 9
+padding-x                = 10
 spacing                  = 12
+# Text and glyph size inside the islands.
+font-size                = 16
+# Quiet contract: everything but the active workspace, the app name and
+# contextual lights sits at this foreground opacity.
+quiet-alpha              = 0.72
 # Widest the focused app's name may get before it elides.
 app-max-width            = 200
 
@@ -81,9 +86,11 @@ app-max-width            = 200
 # low-battery notification threshold (jimmy.battery).
 low                      = 20
 critical                 = 10
-# The battery progress bar.
-bar-width                = 26
-bar-height               = 9
+# The battery pill: wide and tall enough to hold the % inside.
+bar-width                = 52
+bar-height               = 22
+# Charging pulse at the fill edge: one loop, ms.
+pulse-ms                 = 1800
 
 [clock]
 # Qt date format. "h:mm" = 3:04, no AM/PM (brief v1). Open question Q4.
@@ -101,3 +108,18 @@ fade-ms                  = 160
 settle-ms                = 700
 close-ms                 = 100
 close-scale              = 0.97
+
+[toast]
+# Toasts (OSD) grow out of the right island: gap below the bar.
+gap                      = 8
+
+[agents]
+# Usage records shown on the agents icon (ids in ~/.local/state/omarchy/agents/usage).
+ids                      = "claude,opencode,grok"
+# Red dot when any limit is used past this fraction.
+near-limit               = 0.85
+
+[fullscreen]
+# Debounce before the bar hides or returns around a fullscreen toggle.
+debounce-ms              = 50
+

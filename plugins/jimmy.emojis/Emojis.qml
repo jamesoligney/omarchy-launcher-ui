@@ -36,7 +36,7 @@ Item {
   property string filterText: ""
   property string selectedCategory: "all"
   // "All" is a chip of its own: Alt (Option) +1 All, +2..9 the categories, +0 the tenth.
-  readonly property var chips: [{ id: "all", name: "All" }].concat(root.data.categories)
+  readonly property var chips: [{ id: "all", name: "All" }].concat(((root.data && root.data.categories) || []).filter(function(c) { return !!c && !!c.id }))
   readonly property var chipNames: ({
     "Smileys & Emotion": "Smileys", "People & Body": "People", "Animals & Nature": "Animals",
     "Food & Drink": "Food", "Travel & Places": "Travel"
