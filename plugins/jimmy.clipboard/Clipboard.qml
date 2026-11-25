@@ -5,6 +5,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "../jimmy.shared/Tokens.js" as Tokens
 import "../jimmy.shared"
 import "ClipboardHistory.js" as ClipboardHistory
 
@@ -100,7 +101,8 @@ Item {
   property int searchPaddingX: tokenNum("search-padding-x", 16)
   property int searchPaddingY: tokenNum("search-padding-y", 12)
   property int searchSize: tokenNum("search-size", 20)
-  property string fontFamily: Style.font.menuFamily
+  // Text face: [ui] font in shell.toml (SF Compact Display), else the menu font.
+  property string fontFamily: Tokens.str(Commons.Color.shellValues, "ui.font", Style.font.menuFamily)
 
   property int headerHeight: Math.round(searchSize * 1.35) + searchPaddingY * 2
   property int filterHeight: Style.space(30)

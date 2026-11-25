@@ -123,3 +123,8 @@ near-limit               = 0.85
 # Debounce before the bar hides or returns around a fullscreen toggle.
 debounce-ms              = 50
 
+
+[ui]
+# Text face for the islands, toasts and pickers (jimmy.bar, jimmy.osd,
+# jimmy.emojis, jimmy.clipboard). Icon glyphs keep the Nerd Font.
+font                     = "SF Compact Display"

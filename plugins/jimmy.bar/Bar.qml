@@ -69,7 +69,9 @@ Item {
   readonly property color quiet: Util.alpha(Commons.Color.foreground, quietAlpha)
   readonly property color accent: Commons.Color.accent
   readonly property color urgent: Commons.Color.urgent
-  readonly property string fontFamily: Style.font.family
+  readonly property string fontFamily: Tokens.str(tokens, "ui.font", Style.font.family)
+  // Icon glyphs (weather, lights, agents) stay on the Nerd Font.
+  readonly property string iconFamily: Style.font.family
 
   // ----------------------------------------------------------------- data
   MinuteClock { id: clock }
@@ -298,6 +300,7 @@ Item {
   component Light: Label {
     property bool on: false
     visible: on
+    font.family: root.iconFamily
   }
 
   // Click an element to toggle its hosted panel.
@@ -453,6 +456,7 @@ Item {
             Label {
               id: weatherGlyph
               anchors.verticalCenter: undefined
+              font.family: root.iconFamily
               text: root.weatherIcon
               opacity: weatherStaleness.state === "fresh" ? 1 : 0.5
             }
@@ -535,6 +539,7 @@ Item {
             Label {
               id: agentGlyph
               anchors.verticalCenter: undefined
+              font.family: root.iconFamily
               text: "󰚩"
               opacity: root.agentRunning || root.agentNearLimit ? 1 : 0.6
             }

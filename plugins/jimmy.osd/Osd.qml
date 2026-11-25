@@ -107,7 +107,7 @@ Item {
 
   TextMetrics {
     id: messageMetrics
-    font.family: Style.font.family
+    font.family: Tokens.str(root.tokens, "ui.font", Style.font.family)
     font.bold: true
     font.pixelSize: Style.font.title
     text: root.message
