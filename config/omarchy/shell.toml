@@ -92,8 +92,10 @@ glyph-size               = 20
 # Quiet contract: everything but the active workspace, the app name and
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72
-# Widest the focused app's name may get before it elides.
-app-max-width            = 200
+
+[strip]
+# The left strip that holds the workspaces: width reserved on the left edge.
+width                    = 30
 
 [status]
 # The status island's own padding and spacing (tighter than the main

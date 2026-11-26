@@ -11,7 +11,6 @@ import qs.Commons as Commons
 import qs.Ui
 import "../jimmy.shared"
 import "../jimmy.shared/Tokens.js" as Tokens
-import "../jimmy.shared/AppName.js" as AppName
 import "../jimmy.shared/BarGeometry.js" as BarGeometry
 // The stock weather glyph set (9 conditions, day/night), reused as-is.
 import "../jimmy.shared/WeatherIcons.js" as WeatherIcons
@@ -58,7 +57,8 @@ Item {
   readonly property int statusPadding: num("status.padding-x", 18)
   readonly property int statusSpacing: num("status.spacing", 20)
   readonly property real quietAlpha: num("island.quiet-alpha", 0.72)
-  readonly property int appMaxWidth: num("island.app-max-width", 200)
+  // The left strip (workspaces): its reserved width on the left edge.
+  readonly property int stripWidth: num("strip.width", 30)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
@@ -103,10 +103,8 @@ Item {
   // red (battery.low-mix), so it reads apart from the plugged-in accent.
   readonly property color lowTone: Qt.tint(root.accent, Util.alpha(root.urgent, num("battery.low-mix", 0.45)))
 
-  readonly property string appName: {
-    var top = ToplevelManager.activeToplevel
-    return AppName.resolve(top ? top.appId : "", function(id) { return DesktopEntries.heuristicLookup(id) })
-  }
+  // The focused window's full title (a browser's is the page title).
+  readonly property string windowTitle: ToplevelManager.activeToplevel ? (ToplevelManager.activeToplevel.title || "") : ""
 
   // First-party services open to bar plugins.
   readonly property var idleService: shell ? shell.firstPartyServiceFor("omarchy.idle") : null
@@ -548,6 +546,20 @@ Item {
         return false
       }
       property bool hidden: false
+      readonly property var workspaces: {
+        var out = []
+        var values = Hyprland.workspaces.values
+        var activeId = monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : -1
+        for (var i = 0; i < values.length; i++) {
+          var ws = values[i]
+          if (ws.id <= 0 || !ws.monitor || !monitor || ws.monitor.name !== monitor.name) continue
+          if (ws.id !== activeId && ws.toplevels.values.length === 0) continue
+          out.push({ id: ws.id, slot: (ws.id - 1) % 10 + 1, active: ws.id === activeId })
+        }
+        out.sort(function(a, b) { return a.id - b.id })
+        return out
+      }
+
       onUnderFullscreenChanged: fullscreenTimer.restart()
       property Timer fullscreenTimer: Timer {
         interval: root.fullscreenDebounce
@@ -569,6 +581,67 @@ Item {
         exclusiveZone: Math.max(0, root.barHeight - (screenScope.notched ? root.notchHeight : 0))
         WlrLayershell.namespace: "jimmy-bar-reserve"
         WlrLayershell.layer: WlrLayer.Bottom
+      }
+
+      // ----------------------------------------------------- left strip
+      // Workspaces, as a vertical pill centred in a strip on the left edge.
+      // The strip is a real reserve (strip.width): windows, tiled or
+      // floating, stop at its edge. The layer is wider than the reserve so
+      // the pill's glow is not cut off; only the pill takes the pointer.
+      // Hidden with the bar under fullscreen.
+      PanelWindow {
+        id: strip
+        screen: screenScope.modelData
+        visible: !screenScope.hidden
+        anchors { top: true; bottom: true; left: true }
+        implicitWidth: root.stripWidth + root.glowBlur
+        color: "transparent"
+        exclusionMode: ExclusionMode.Normal
+        exclusiveZone: root.stripWidth
+        mask: Region { item: pill }
+        WlrLayershell.namespace: "jimmy-strip"
+        WlrLayershell.layer: WlrLayer.Top
+
+        Rectangle {
+          id: pill
+          readonly property int inset: 3
+          x: inset
+          width: root.stripWidth - 2 * inset
+          height: column.implicitHeight + 2 * inset
+          anchors.verticalCenter: parent.verticalCenter
+          visible: screenScope.workspaces.length > 0
+          radius: Math.min(root.islandRadius, width / 2)
+          color: root.islandColor
+          border.width: 1
+          border.color: root.islandBorder
+          IslandGlow {}
+          Column {
+            id: column
+            x: pill.inset
+            y: pill.inset
+            spacing: 2
+            Repeater {
+              model: screenScope.workspaces
+              Rectangle {
+                required property var modelData
+                width: pill.width - 2 * pill.inset
+                height: width + 4
+                radius: root.islandRadius - 4
+                color: modelData.active ? Util.alpha(root.accent, 0.22) : "transparent"
+                Label {
+                  anchors.centerIn: parent
+                  text: String(parent.modelData.slot)
+                  color: parent.modelData.active ? root.accent : root.quiet
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "' + parent.modelData.id + '" })')
+                }
+              }
+            }
+          }
+        }
       }
 
       PanelWindow {
@@ -608,20 +681,6 @@ Item {
         }
         WlrLayershell.layer: WlrLayer.Top
 
-        readonly property var workspaces: {
-          var out = []
-          var values = Hyprland.workspaces.values
-          var activeId = monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : -1
-          for (var i = 0; i < values.length; i++) {
-            var ws = values[i]
-            if (ws.id <= 0 || !ws.monitor || !monitor || ws.monitor.name !== monitor.name) continue
-            if (ws.id !== activeId && ws.toplevels.values.length === 0) continue
-            out.push({ id: ws.id, slot: (ws.id - 1) % 10 + 1, active: ws.id === activeId })
-          }
-          out.sort(function(a, b) { return a.id - b.id })
-          return out
-        }
-
         Connections {
           target: Hyprland
           function onRawEvent(event) {
@@ -632,43 +691,17 @@ Item {
         }
 
         // ---------------------------------------------------- left island
+        // The focused window's full title, nothing else (workspaces live in
+        // the left strip). Elides inside the ear, never wraps.
         Island {
+          id: leftIsland
+          visible: root.windowTitle !== ""
           centerX: window.ears.leftCenter
           maxWidth: window.ears.maxIslandWidth
-
-          Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-            Repeater {
-              model: window.workspaces
-              Rectangle {
-                required property var modelData
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(root.islandHeight - 8, slotText.implicitWidth + 12)
-                height: root.islandHeight - 8
-                radius: root.islandRadius - 3
-                color: modelData.active ? Util.alpha(root.accent, 0.22) : "transparent"
-                Label {
-                  id: slotText
-                  anchors.centerIn: parent
-                  text: String(parent.modelData.slot)
-                  color: parent.modelData.active ? root.accent : root.quiet
-                }
-                Hint { text: parent.modelData.slot <= 9 ? String(parent.modelData.slot) : "" }
-                MouseArea {
-                  anchors.fill: parent
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "' + parent.modelData.id + '" })')
-                }
-              }
-            }
-          }
-
           Label {
-            visible: root.appName !== ""
-            width: Math.min(implicitWidth, root.appMaxWidth)
+            width: Math.min(implicitWidth, leftIsland.maxWidth - 2 * leftIsland.padding)
             elide: Text.ElideRight
-            text: root.appName
+            text: root.windowTitle
             color: root.ink
           }
         }

@@ -1,7 +1,9 @@
 -- Floating default (bar brief Q8, Stage 18): a window that floats starts at
 -- this size, centred on the monitor's usable area (below the bar's reserve).
 -- Change the size here, in one place. 1100x619 is measured from the Zen
--- window James sized by hand (Stage 20); centred, it lands at (314, 273).
+-- window James sized by hand (Stage 20). Centred on the usable area (left
+-- of it the 30px workspace strip, above it the 48px bar), it lands at
+-- (329, 273) (Stage 24; it was (314, 273) before the strip).
 o.float_default = { width = 1100, height = 619 }
 
 local size = { o.float_default.width, o.float_default.height }
@@ -136,11 +138,28 @@ local function reset_switched(before)
   end
 end
 
+-- The other way (Stage 24): a workspace switched to a tiled layout tiles
+-- its normal app windows. Omarchy's mode only tiles windows it floated
+-- itself, and since floating became the default every new window floats on
+-- its own account, so without this Super+L changed the layout while every
+-- window stayed floating: nothing visibly happened. Dialogs, apps that size
+-- themselves, fullscreen and pinned windows are left as they are.
+local function tile_switched(spec)
+  if type(spec) ~= "table" or not spec.workspace or spec.mode == "floating" then return end
+  local own = own_float_size()
+  for _, window in ipairs(hl.get_windows({ workspace = tostring(spec.workspace) })) do
+    if window.floating and not window.pinned and not keeps_own_size(window, own) then
+      hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. window.address }))
+    end
+  end
+end
+
 local function resetting(fn)
-  return function(...)
+  return function(spec, ...)
     local before = on_floating()
-    local result = fn(...)
+    local result = fn(spec, ...)
     reset_switched(before)
+    tile_switched(spec)
     return result
   end
 end

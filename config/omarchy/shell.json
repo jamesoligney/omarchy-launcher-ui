@@ -129,7 +129,8 @@
     "omarchy.reminders",
     "omarchy.battery",
     "omarchy.osd",
-    "omarchy.notifications"
+    "omarchy.notifications",
+    "omarchy.dock"
   ],
   "dock": {
     "autohide": true,
@@ -219,11 +220,11 @@
       "shimmerScaleMax": 1.45,
       "shimmerScaleMin": 0.75,
       "gradient": [
-        "rgba(ff3437ee)",
-        "rgba(df003800)"
+        "rgba(ffc48aee)",
+        "rgba(ff5a1f00)"
       ],
       "gradientPositions": "0 99",
-      "baseColor": "rgba(470409dd)"
+      "baseColor": "rgba(472a14dd)"
     },
     {
       "clock12": true,
