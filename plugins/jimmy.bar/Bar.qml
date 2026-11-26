@@ -59,6 +59,8 @@ Item {
   readonly property real quietAlpha: num("island.quiet-alpha", 0.72)
   // The left strip (workspaces): its reserved width on the left edge.
   readonly property int stripWidth: num("strip.width", 30)
+  // The strip bar's minimum height, as a share of the screen's height.
+  readonly property real stripMinHeight: num("strip.min-height", 0.5)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
@@ -584,20 +586,24 @@ Item {
       }
 
       // ----------------------------------------------------- left strip
-      // Workspaces, as a vertical pill centred in a strip on the left edge.
-      // The strip is a real reserve (strip.width): windows, tiled or
-      // floating, stop at its edge. The layer is wider than the reserve so
-      // the pill's glow is not cut off; only the pill takes the pointer.
-      // Hidden with the bar under fullscreen.
+      // Workspaces, in a bar on the left edge: the start of the frame. The
+      // same island as the top bar (glass, outline, glow, radius), vertical:
+      // strip.width wide, one island.gap off the edge as the top islands sit
+      // off the top, at least strip.min-height of the screen tall and taller
+      // only if the numbers need it, centred in the space below the top bar.
+      // The numbers float in its middle. The reserve is the bar's gap +
+      // width, so tiled windows keep Hyprland's usual gap after it. The layer
+      // is wider than the reserve so the glow is not cut off; only the bar
+      // takes the pointer. Hidden with the bar under fullscreen.
       PanelWindow {
         id: strip
         screen: screenScope.modelData
         visible: !screenScope.hidden
         anchors { top: true; bottom: true; left: true }
-        implicitWidth: root.stripWidth + root.glowBlur
+        implicitWidth: root.islandGap + root.stripWidth + root.glowBlur
         color: "transparent"
         exclusionMode: ExclusionMode.Normal
-        exclusiveZone: root.stripWidth
+        exclusiveZone: root.islandGap + root.stripWidth
         mask: Region { item: pill }
         WlrLayershell.namespace: "jimmy-strip"
         WlrLayershell.layer: WlrLayer.Top
@@ -605,9 +611,10 @@ Item {
         Rectangle {
           id: pill
           readonly property int inset: 3
-          x: inset
-          width: root.stripWidth - 2 * inset
-          height: column.implicitHeight + 2 * inset
+          readonly property real minHeight: Math.round((strip.screen ? strip.screen.height : 0) * root.stripMinHeight)
+          x: root.islandGap
+          width: root.stripWidth
+          height: Math.min(strip.height, Math.max(minHeight, column.implicitHeight + 2 * inset))
           anchors.verticalCenter: parent.verticalCenter
           visible: screenScope.workspaces.length > 0
           radius: Math.min(root.islandRadius, width / 2)
@@ -617,8 +624,7 @@ Item {
           IslandGlow {}
           Column {
             id: column
-            x: pill.inset
-            y: pill.inset
+            anchors.centerIn: parent
             spacing: 2
             Repeater {
               model: screenScope.workspaces
@@ -685,7 +691,10 @@ Item {
           target: Hyprland
           function onRawEvent(event) {
             var name = event ? String(event.name) : ""
-            if (name === "fullscreen") Hyprland.refreshToplevels()
+            // Quickshell does not move a window between its workspaces'
+            // toplevel lists on its own, so a workspace reached only by a
+            // moved window would be missing from the strip: re-read them.
+            if (name === "fullscreen" || name === "movewindowv2") Hyprland.refreshToplevels()
             else if (name === "submap") root.leaderActive = String(event.data) === "bar"
           }
         }

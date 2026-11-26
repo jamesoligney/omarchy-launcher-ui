@@ -94,8 +94,11 @@ glyph-size               = 20
 quiet-alpha              = 0.72
 
 [strip]
-# The left strip that holds the workspaces: width reserved on the left edge.
+# The left bar that holds the workspaces: its visible width (it sits one
+# island.gap off the edge; the reserve is gap + width), and its minimum
+# height as a share of the screen's height (it grows only if needed).
 width                    = 30
+min-height               = 0.5
 
 [status]
 # The status island's own padding and spacing (tighter than the main
