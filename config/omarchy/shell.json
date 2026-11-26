@@ -82,6 +82,9 @@
           "id": "lock-explorer",
           "source": "~/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/BarWidget.qml",
           "type": "qml"
+        },
+        {
+          "id": "jimmy.menu"
         }
       ]
     },
