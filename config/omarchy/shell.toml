@@ -15,6 +15,11 @@ right                    = 15
 bottom                   = 15
 radius                   = 20
 inner-radius             = 16
+# The fill mixes the theme accent into the background glass (0 = the old
+# dark glass, 1 = solid accent); the edge is the 1px line around the opening
+# (0 drops it). Stage 29 raises the fill until the hull reads at a glance.
+tint                     = 0.18
+edge                     = 0.0
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's

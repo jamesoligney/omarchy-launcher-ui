@@ -29,10 +29,17 @@ Item {
   readonly property int notchWidth: num("notch.width", 174)
   readonly property int notchHeight: num("notch.height", 32)
 
-  // The same glass and accent edge as the old islands, so a theme switch
-  // re-tints the hull with everything else.
-  readonly property color glass: Util.alpha(Commons.Color.background, num("launcher.panel-background-alpha", 0.70))
-  readonly property color edge: Util.alpha(Commons.Color.accent, num("launcher.panel-border-alpha", 0.16))
+  // Frame fill: the theme accent mixed into the background glass. The mix is
+  // a token (frame.tint), so a light accent tint reads as a frame on a dark
+  // wallpaper without becoming a solid orange bar. The fill alpha stays the
+  // launcher glass alpha; only the hue is tinted. The edge is the 1px line
+  // around the opening (frame.edge = 0 drops it).
+  readonly property real tint: num("frame.tint", 0.18)
+  readonly property real edgeAlpha: num("frame.edge", 0.16)
+  readonly property color glass: Util.alpha(
+    Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.accent, tint)),
+    num("launcher.panel-background-alpha", 0.70))
+  readonly property color edge: Util.alpha(Commons.Color.accent, edgeAlpha)
 
   Variants {
     model: Quickshell.screens
@@ -112,14 +119,18 @@ Item {
 
             // The hull's inner edge, one continuous 1px accent line around
             // the opening. The notch is a hole, not an outlined shape.
-            ctx.beginPath()
-            rounded(ctx, frameLeft + 0.5, frameTop + 0.5,
-              width - frameLeft - frameRight - 1,
-              height - frameTop - frameBottom - 1,
-              Math.max(0, innerRadius - 0.5))
-            ctx.strokeStyle = rgba(edge)
-            ctx.lineWidth = 1
-            ctx.stroke()
+            // frame.edge = 0 drops the line and leaves the fill edge as the
+            // hull boundary.
+            if (edge.a > 0) {
+              ctx.beginPath()
+              rounded(ctx, frameLeft + 0.5, frameTop + 0.5,
+                width - frameLeft - frameRight - 1,
+                height - frameTop - frameBottom - 1,
+                Math.max(0, innerRadius - 0.5))
+              ctx.strokeStyle = rgba(edge)
+              ctx.lineWidth = 1
+              ctx.stroke()
+            }
           }
         }
       }

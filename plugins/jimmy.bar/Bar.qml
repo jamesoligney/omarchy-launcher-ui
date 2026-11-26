@@ -410,6 +410,7 @@ Item {
     Text {
       id: glyph
       anchors.verticalCenter: parent.verticalCenter
+      anchors.verticalCenterOffset: 0.75
       font.family: root.iconFamily
       font.pixelSize: root.glyphSize
       textFormat: Text.PlainText
@@ -657,6 +658,7 @@ Item {
           centerX: window.ears.leftCenter
           maxWidth: window.ears.maxIslandWidth
           Label {
+            anchors.verticalCenterOffset: -0.5
             width: Math.min(implicitWidth, leftIsland.maxWidth - 2 * leftIsland.padding)
             elide: Text.ElideRight
             text: root.windowTitle
@@ -683,6 +685,7 @@ Item {
           // Battery: the number only. Accent while plugged in, neutral on
           // battery, amber at battery.low and red at battery.critical.
           Label {
+            anchors.verticalCenterOffset: -0.5
             visible: root.batteryPercent >= 0
             text: Math.max(0, root.batteryPercent) + "%"
             color: root.pluggedIn ? root.accent
@@ -702,6 +705,8 @@ Item {
             visible: root.weatherIcon !== ""
             WeatherIcon {
               id: weatherGlyph
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.verticalCenterOffset: -1.0
               key: root.weatherIcon
               size: root.glyphSize
               color: root.quiet
@@ -820,6 +825,7 @@ Item {
                 }
                 Label {
                   id: icon
+                  anchors.verticalCenterOffset: 0.75
                   x: root.islandSpacing / 2
                   text: modelData.icon
                   font.family: root.iconFamily
