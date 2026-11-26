@@ -74,7 +74,7 @@ PanelWindow {
     id: card
     width: shell.contentWidth + 2 * shell.pad
     height: shell.contentHeight + 2 * shell.pad
-    x: Math.round((shell.anchor === "left" ? shell.ears.leftCenter : shell.ears.rightCenter) - width / 2)
+    x: Math.round((shell.anchor === "left" ? BarLayout.left(shell.ears.leftCenter) : BarLayout.right(shell.ears.rightCenter)) - width / 2)
     y: shell.islandBottom
     radius: Tokens.num(shell.tokens, "island.radius", 9)
     color: Util.alpha(Commons.Color.background, Tokens.num(shell.tokens, "launcher.panel-background-alpha", 0.70))

@@ -1548,7 +1548,8 @@ Item {
       Item {
         id: clipper
         visible: surface.showingNotifications
-        x: Math.round(surface.ears.rightCenter - service.notificationWidth / 2 - motionInset)
+        // Under the whole right island (main + status), live (BarLayout).
+        x: Math.round(BarLayout.right(surface.ears.rightCenter) - service.notificationWidth / 2 - motionInset)
         y: surface.islandBottom
         // Room for the arrival's scale animation, and the gap from the edge.
         readonly property int motionInset: Style.spacing.sm

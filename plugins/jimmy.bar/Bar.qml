@@ -823,6 +823,12 @@ Item {
             Hint { text: "A" }
           }
         }
+        // Publish the islands' live centres for the toasts, notifications
+        // and cards that hang from them (jimmy.shared/BarLayout): the right
+        // one spans the main island and the status island joined to it.
+        Binding { target: BarLayout; property: "rightCenter"; value: (rightIsland.x + statusIsland.x + statusIsland.width) / 2 }
+        Binding { target: BarLayout; property: "leftCenter"; value: window.ears.leftCenter }
+
         // One glow for the joined pair, the gap between them included.
         Item {
           z: -1

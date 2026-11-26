@@ -134,7 +134,8 @@ Item {
       // attached under it, island glass, thin outline, island radius.
       readonly property var tokens: Commons.Color.shellValues
       readonly property var ears: BarGeometry.ears(panel.width, panel.screen ? String(panel.screen.name).indexOf("eDP") === 0 : true, tokens)
-      x: Math.round(ears.rightCenter - width / 2)
+      // Under the whole right island (main + status), live (BarLayout).
+      x: Math.round(BarLayout.right(ears.rightCenter) - width / 2)
       y: Tokens.num(tokens, "bar.height", 44) - Tokens.num(tokens, "island.gap", 3) + Tokens.num(tokens, "toast.gap", 0)
       radius: Tokens.num(tokens, "island.radius", 9)
       color: Util.alpha(Commons.Color.background, Tokens.num(tokens, "launcher.panel-background-alpha", 0.70))

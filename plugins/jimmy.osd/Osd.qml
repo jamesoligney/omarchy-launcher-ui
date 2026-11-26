@@ -162,7 +162,8 @@ Item {
       readonly property var ears: BarGeometry.ears(panel.width, notched, root.tokens)
       width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
       height: card.borderTop + root.pad + Style.font.displayLarge + root.pad + card.borderBottom
-      x: Math.round(ears.rightCenter - width / 2)
+      // Under the whole right island (main + status), live (BarLayout).
+      x: Math.round(BarLayout.right(ears.rightCenter) - width / 2)
       // Attached: the toast's top edge is the island's bottom edge.
       y: Tokens.num(root.tokens, "bar.height", 44) - Tokens.num(root.tokens, "island.gap", 3) + Tokens.num(root.tokens, "toast.gap", 0)
       color: Util.alpha(Commons.Color.background, Tokens.num(root.tokens, "launcher.panel-background-alpha", 0.70))

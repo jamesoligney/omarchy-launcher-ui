@@ -1,0 +1,9 @@
+singleton BarLayout 1.0 BarLayout.qml
+CardMotion 1.0 CardMotion.qml
+IslandGlow 1.0 IslandGlow.qml
+MinuteClock 1.0 MinuteClock.qml
+PanelAdopter 1.0 PanelAdopter.qml
+PanelShell 1.0 PanelShell.qml
+PowerEvents 1.0 PowerEvents.qml
+Staleness 1.0 Staleness.qml
+WeatherIcon 1.0 WeatherIcon.qml
