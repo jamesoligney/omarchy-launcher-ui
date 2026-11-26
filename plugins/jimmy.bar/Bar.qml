@@ -19,10 +19,10 @@ import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkMode
 // Top bar v1: one deep bar across the top (bar.height, 75), tinted from the
 // theme accent, with the camera notch cut out of it. The ears either side of
 // the notch are joined by the band below it.
-// Left ear (Top bar v2): an island with island.left-padding (30) at both
-// ends, two levels: workspaces + focused app on top (left-justified); below,
-// right-justified, every other bar widget the layout configures (shown, not
-// curated) and then Wi-Fi / Bluetooth / mic / agents.
+// Left ear: workspaces + focused app, one row, at island.left-padding (30).
+// Band below the notch (Top bar v3): every other bar widget the layout
+// configures (shown, not curated), then Wi-Fi / Bluetooth / mic / agents,
+// tight, centred under the cut-out.
 // Right ear: time, battery, weather (larger), contextual lights.
 // The stock panel widgets (audio, Bluetooth, network, power, display, clock,
 // weather, agents, microphone) are hosted here, invisible, so their panels and
@@ -68,6 +68,10 @@ Item {
   readonly property int notchRadius: num("notch.radius", 8)
   // The left island's padding from the screen edge and from the notch.
   readonly property int leftPadding: num("island.left-padding", 30)
+  // The band below the notch: the gap between its groups and lights, and
+  // between stock widgets (their slots carry their own padding).
+  readonly property int bandSpacing: num("band.spacing", 10)
+  readonly property int bandWidgetSpacing: num("band.widget-spacing", 0)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
@@ -167,6 +171,9 @@ Item {
   readonly property bool micMuted: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].muted === true
   readonly property bool micInUse: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].inUse === true
   property bool recording: false
+  // The band's width and the room for it (centred, between the left island
+  // and the right island), published by the bar window for status.
+  property var band: ({})
   // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
   // every element shows its letter.
   property bool leaderActive: false
@@ -290,6 +297,7 @@ Item {
         leader: root.leaderActive,
         silenced: root.silenced,
         quick: { open: root.quickOpen, keyboard: root.quickKeyboard, index: root.quickIndex, hovered: root.quickHovered },
+        band: root.band,
         inventory: root.inventoryIds.map(function(id) { return id + " " + (root.hosts[id] ? Math.round(root.hosts[id].implicitWidth) : "not loaded") }),
         adopted: adopter.adoptedIds,
         lastAdopt: adopter.lastAttempt
@@ -682,17 +690,8 @@ Item {
           }
         }
 
-        // The band below the notch: a row in the bar, centred under the
-        // cut-out, ready for elements (empty in v1).
-        Row {
-          id: band
-          x: Math.round((window.width - width) / 2)
-          y: fill.notchH
-          height: root.barHeight - fill.notchH
-          spacing: root.statusSpacing
-        }
 
-        // ----------------------------------------------- left ear, top level
+        // ------------------------------------------------------- left ear
         // Workspaces (occupied + active, accent when active), then the focused
         // window's title, left-justified at island.left-padding. Elides in the
         // island, never wraps.
@@ -811,23 +810,24 @@ Item {
 
         }
 
-        // -------------------------------------------- left ear, lower level
+        // ---------------------------------------------- band below the notch
         // Everything else the bar has (inventoryIds, each widget drawing
-        // itself at the level's height), then Wi-Fi, Bluetooth, mic, agents,
-        // right-justified at island.left-padding from the notch, so the two
-        // levels stagger. Not trimmed to fit: if it is wider than the ear it
-        // runs past the island's left edge.
+        // itself at the level's height), then Wi-Fi, Bluetooth, mic, agents:
+        // one tight row centred under the cut-out, from the notch's bottom to
+        // the bar's. Not trimmed to fit: if it is wider than the room between
+        // the left and right ears' contents, it says so (status: band).
         Island {
           id: statusIsland
-          x: Math.round(2 * window.ears.leftCenter - root.leftPadding - width)
-          y: root.islandGap + root.levelHeight
-          height: root.levelHeight
+          x: Math.round((window.width - width) / 2)
+          y: screenScope.notched ? root.notchHeight : root.islandGap
+          height: root.barHeight - y
           padding: 0
-          gap: root.statusSpacing
+          gap: root.bandSpacing
           Hosts {
             anchors.verticalCenter: parent.verticalCenter
             shown: true
             size: root.levelHeight
+            spacing: root.bandWidgetSpacing
             ids: root.inventoryIds
           }
           StatusLight {
@@ -835,21 +835,21 @@ Item {
             text: root.netIcon
             color: root.netState === "down" ? root.urgent : root.quiet
             dim: root.netState === "off" ? 0.45 : 1
-            Hint { text: "N"; line: root.levelHeight }
+            Hint { text: "N"; line: statusIsland.height }
           }
           StatusLight {
             target: "omarchy.bluetooth"
             text: root.btIcon
             color: root.btConnected ? root.accent : root.quiet
             dim: root.btOn ? 1 : 0.45
-            Hint { text: "T"; line: root.levelHeight }
+            Hint { text: "T"; line: statusIsland.height }
           }
           StatusLight {
             text: root.micMuted ? "󰍭" : "󰍬"
             color: root.micInUse ? root.accent : root.quiet
             dim: root.micInUse ? 1 : 0.45
             onTapped: { var mic = root.hosts["omarchy.microphone"]; if (mic && mic.toggleMute) mic.toggleMute() }
-            Hint { text: "M"; line: root.levelHeight }
+            Hint { text: "M"; line: statusIsland.height }
           }
           // Agents: plain for now, like the other lights at rest: quiet at
           // 60%, always. Running and limits show in the agents panel and in
@@ -859,13 +859,19 @@ Item {
             text: "\udb81\ude74"
             color: root.quiet
             dim: 0.6
-            Hint { text: "A"; line: root.levelHeight }
+            Hint { text: "A"; line: statusIsland.height }
           }
         }
         // Publish the islands' live centres for the toasts, notifications
         // and cards that hang from them (jimmy.shared/BarLayout).
         Binding { target: BarLayout; property: "rightCenter"; value: rightIsland.x + rightIsland.width / 2 }
         Binding { target: BarLayout; property: "leftCenter"; value: window.ears.leftCenter }
+        Binding {
+          target: root
+          property: "band"
+          value: ({ width: Math.round(statusIsland.width),
+            room: Math.round(2 * Math.min(window.width / 2 - leftIsland.x - leftIsland.width, rightIsland.x - window.width / 2)) })
+        }
 
         // Quick strip: outside the island, its right edge on the island's left
         // edge, so opening it never moves the island. Items grow from zero
@@ -959,7 +965,7 @@ Item {
     property bool shown: false
     property int size: root.barHeight
     height: size
-    spacing: shown ? root.statusSpacing : 0
+    spacing: 0
     opacity: shown ? 1 : 0
     enabled: shown
     Repeater {

@@ -101,6 +101,12 @@ glyph-size               = 20
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72
 
+[band]
+# The row below the notch (Top bar v3): gap between its groups and status
+# lights, and between stock widgets (their slots carry their own padding).
+spacing                  = 10
+widget-spacing           = 0
+
 [primary]
 # The right ear's primaries (time, battery %, weather), larger than the rest.
 text-size                = 26
