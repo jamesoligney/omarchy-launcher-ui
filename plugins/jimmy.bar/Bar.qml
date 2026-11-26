@@ -410,7 +410,7 @@ Item {
     Text {
       id: glyph
       anchors.verticalCenter: parent.verticalCenter
-      anchors.verticalCenterOffset: 0.75
+      anchors.verticalCenterOffset: 0.25
       font.family: root.iconFamily
       font.pixelSize: root.glyphSize
       textFormat: Text.PlainText

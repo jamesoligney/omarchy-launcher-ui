@@ -114,8 +114,11 @@ Item {
               var nx = Math.round((width - notchW) / 2)
               ctx.rect(nx, 0, notchW, notchH)
             }
+            // QML's Context2D ignores fill("evenodd"); the rule is a property.
+            // Odd-even makes the opening and the notch real holes.
+            ctx.fillRule = Qt.OddEvenFill
             ctx.fillStyle = rgba(glass)
-            ctx.fill("evenodd")
+            ctx.fill()
 
             // The hull's inner edge, one continuous 1px accent line around
             // the opening. The notch is a hole, not an outlined shape.
