@@ -37,13 +37,15 @@ Item {
   readonly property color glass: Util.alpha(
     Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.accent, tint)),
     num("launcher.panel-background-alpha", 0.70))
-  // Bevel (Stage 31): the opening's edge catches light on top and falls into
-  // shadow at the bottom -- one stroke on the hull side of the edge, shaded
-  // top to bottom: foreground highlight -> clear -> background shadow.
-  // Alphas are tokens; 0 drops that side.
-  readonly property color bevelLight: Util.alpha(Commons.Color.foreground, num("frame.bevel-light", 0.10))
-  readonly property color bevelDark: Util.alpha(Commons.Color.background, num("frame.bevel-dark", 0.30))
-  readonly property real bevelWidth: num("frame.bevel-width", 1)
+  // Bevel (Stage 33): the hull itself is a molding. Across every band, outer
+  // edge -> opening, the surface stays high at the screen edge, peaks in the
+  // middle and falls away to the opening. High reads light (accent warmed with
+  // foreground), low reads dark (background). frame.bevel-light and
+  // frame.bevel-dark are how far the ridge and the foot move toward them.
+  readonly property color bevelLight: Qt.tint(Commons.Color.accent, Util.alpha(Commons.Color.foreground, 0.5))
+  readonly property color bevelDark: Commons.Color.background
+  readonly property real bevelLightMix: num("frame.bevel-light", 0.30)
+  readonly property real bevelDarkMix: num("frame.bevel-dark", 0.50)
 
   Variants {
     model: Quickshell.screens
@@ -70,7 +72,8 @@ Item {
           property color glass: root.glass
           property color bevelLight: root.bevelLight
           property color bevelDark: root.bevelDark
-          property real bevelWidth: root.bevelWidth
+          property real bevelLightMix: root.bevelLightMix
+          property real bevelDarkMix: root.bevelDarkMix
           property int frameTop: root.frameTop
           property int frameLeft: root.frameLeft
           property int frameRight: root.frameRight
@@ -82,7 +85,8 @@ Item {
           onGlassChanged: requestPaint()
           onBevelLightChanged: requestPaint()
           onBevelDarkChanged: requestPaint()
-          onBevelWidthChanged: requestPaint()
+          onBevelLightMixChanged: requestPaint()
+          onBevelDarkMixChanged: requestPaint()
           onFrameTopChanged: requestPaint()
           onFrameLeftChanged: requestPaint()
           onFrameRightChanged: requestPaint()
@@ -111,40 +115,42 @@ Item {
             return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + ","
               + Math.round(c.b * 255) + "," + c.a.toFixed(3) + ")"
           }
+          // Surface height across a band, t = 0 at the screen edge, 1 at the
+          // opening: 0.7 at the edge, ridge 1.0 mid-band, 0 at the opening.
+          // Returned as a shade in -1..1 (0 = flat glass).
+          function shade(t) {
+            var h = t <= 0.5 ? 0.7 + 0.6 * t : 2 * (1 - t)
+            return 2 * h - 1
+          }
+          function mix(a, b, k) {
+            return Qt.rgba(a.r + (b.r - a.r) * k, a.g + (b.g - a.g) * k,
+              a.b + (b.b - a.b) * k, a.a)
+          }
           onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
-            ctx.beginPath()
-            rounded(ctx, 0, 0, width, height, outerRadius)
-            rounded(ctx, frameLeft, frameTop, width - frameLeft - frameRight,
-              height - frameTop - frameBottom, innerRadius)
-            if (notchW > 0 && notchH > 0) {
-              var nx = Math.round((width - notchW) / 2)
-              ctx.rect(nx, 0, notchW, notchH)
-            }
-            // QML's Context2D ignores fill("evenodd"); the rule is a property.
-            // Odd-even makes the opening and the notch real holes.
+            var iw = width - frameLeft - frameRight, ih = height - frameTop - frameBottom
+            var steps = Math.max(frameTop, frameLeft, frameRight, frameBottom)
+            // Rings from the outer edge inward, each filling everything from
+            // its rounded edge to the opening. "copy" replaces what the
+            // previous ring left, so rings meet without seams or stacked alpha.
             ctx.fillRule = Qt.OddEvenFill
-            ctx.fillStyle = rgba(glass)
-            ctx.fill()
-
-            // The bevel sits just outside the opening, on the hull, so it
-            // never draws over the desktop.
-            if (bevelWidth > 0 && (bevelLight.a > 0 || bevelDark.a > 0)) {
-              var b = bevelWidth / 2
-              var top = frameTop - b, bottom = height - frameBottom + b
-              var shade = ctx.createLinearGradient(0, top, 0, bottom)
-              shade.addColorStop(0, rgba(bevelLight))
-              shade.addColorStop(0.5, rgba(Qt.rgba(bevelLight.r, bevelLight.g, bevelLight.b, 0)))
-              shade.addColorStop(0.5, rgba(Qt.rgba(bevelDark.r, bevelDark.g, bevelDark.b, 0)))
-              shade.addColorStop(1, rgba(bevelDark))
+            ctx.globalCompositeOperation = "copy"
+            for (var k = 0; k < steps; k++) {
+              var t = k / steps, s = shade((k + 0.5) / steps)
               ctx.beginPath()
-              rounded(ctx, frameLeft - b, top, width - frameLeft - frameRight + bevelWidth,
-                bottom - top, innerRadius + b)
-              ctx.strokeStyle = shade
-              ctx.lineWidth = bevelWidth
-              ctx.stroke()
+              rounded(ctx, frameLeft * t, frameTop * t,
+                width - (frameLeft + frameRight) * t, height - (frameTop + frameBottom) * t,
+                outerRadius + (innerRadius - outerRadius) * t)
+              rounded(ctx, frameLeft, frameTop, iw, ih, innerRadius)
+              ctx.fillStyle = rgba(s >= 0 ? mix(glass, bevelLight, s * bevelLightMix)
+                                          : mix(glass, bevelDark, -s * bevelDarkMix))
+              ctx.fill()
             }
+            ctx.globalCompositeOperation = "source-over"
+            // The notch is a hole through the top band.
+            if (notchW > 0 && notchH > 0)
+              ctx.clearRect(Math.round((width - notchW) / 2), 0, notchW, notchH)
           }
         }
       }
