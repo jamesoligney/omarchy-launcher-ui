@@ -19,8 +19,10 @@ import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkMode
 // Top bar v1: one deep bar across the top (bar.height, 75), tinted from the
 // theme accent, with the camera notch cut out of it. The ears either side of
 // the notch are joined by the band below it.
-// Left ear, two levels: workspaces + focused app on top (left-justified),
-// Wi-Fi / Bluetooth / mic / agents below (right-justified to the notch).
+// Left ear (Top bar v2): an island with island.left-padding (30) at both
+// ends, two levels: workspaces + focused app on top (left-justified); below,
+// right-justified, every other bar widget the layout configures (shown, not
+// curated) and then Wi-Fi / Bluetooth / mic / agents.
 // Right ear: time, battery, weather (larger), contextual lights.
 // The stock panel widgets (audio, Bluetooth, network, power, display, clock,
 // weather, agents, microphone) are hosted here, invisible, so their panels and
@@ -64,8 +66,8 @@ Item {
   readonly property int primaryGlyph: num("primary.glyph-size", 28)
   readonly property int notchWidth: num("notch.width", 174)
   readonly property int notchRadius: num("notch.radius", 8)
-  readonly property int notchInset: num("notch.inset", 10)
-  readonly property int cornerInset: num("notch.corner-inset", 18)
+  // The left island's padding from the screen edge and from the notch.
+  readonly property int leftPadding: num("island.left-padding", 30)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
@@ -288,6 +290,7 @@ Item {
         leader: root.leaderActive,
         silenced: root.silenced,
         quick: { open: root.quickOpen, keyboard: root.quickKeyboard, index: root.quickIndex, hovered: root.quickHovered },
+        inventory: root.inventoryIds.map(function(id) { return id + " " + (root.hosts[id] ? Math.round(root.hosts[id].implicitWidth) : "not loaded") }),
         adopted: adopter.adoptedIds,
         lastAdopt: adopter.lastAttempt
       })
@@ -295,15 +298,31 @@ Item {
   }
 
   // --------------------------------------------------- hosted panel widgets
-  readonly property var hostIds: ["omarchy.audio", "omarchy.bluetooth", "omarchy.network", "omarchy.power",
-    "omarchy.monitor", "omarchy.clock", root.weatherId, "omarchy.agents", "omarchy.microphone",
-    "io.github.cwilliams5.locus"]
+  // Hosted invisibly: the right ear's (clock, weather) and the status
+  // lights' widgets, so their panels and keys work and drop from them.
+  readonly property var rightHostIds: ["omarchy.clock", root.weatherId]
   // Weather: the user clone (jimmy.weather: the bar's own icon set in its
   // panel) when installed, else stock. Either way it also answers to
   // "omarchy.weather", so leader W and `shell toggle omarchy.weather` work.
   readonly property string weatherId: barWidgetRegistry && barWidgetRegistry.widgets["jimmy.weather"] ? "jimmy.weather" : "omarchy.weather"
   // Panels for the status island's lights drop from the status island.
   readonly property var statusHostIds: ["omarchy.network", "omarchy.bluetooth", "omarchy.microphone", "omarchy.agents"]
+  // Shown in the left ear's lower level: every other widget the bar layout
+  // (shell.json bar.layout, all sections) configures, in layout order. Only
+  // what the bar already draws its own way, and dividers, are left out.
+  readonly property var drawnIds: ["omarchy.clock", "omarchy.weather", "jimmy.weather", "jimmy.workspaces",
+    "omarchy.workspaces", "jimmy.active-window", "omarchy.active-window", "io.github.nikhill-666.divider"]
+  readonly property var inventoryIds: {
+    var layout = barConfig && barConfig.layout ? barConfig.layout : {}, out = []
+    for (var section in layout) {
+      var list = layout[section] || []
+      for (var i = 0; i < list.length; i++) {
+        var id = list[i] && typeof list[i] === "object" ? list[i].id : list[i]
+        if (id && drawnIds.indexOf(id) < 0 && statusHostIds.indexOf(id) < 0 && out.indexOf(id) < 0) out.push(id)
+      }
+    }
+    return out
+  }
   property var hosts: ({})
   property var activePopout: null
   // Hosted panels open in the shared panel language (PanelShell family).
@@ -351,7 +370,7 @@ Item {
     PluginBarApi {}
   }
 
-  function apiFor(id) {
+  function apiFor(id, size) {
     var api = apiComponent.createObject(root, {
       pluginId: id,
       moduleName: id,
@@ -379,7 +398,7 @@ Item {
     api.background = Qt.binding(function() { return root.islandColor })
     api.urgent = Qt.binding(function() { return root.urgent })
     api.fontFamily = Qt.binding(function() { return root.fontFamily })
-    api.barSize = Qt.binding(function() { return root.barHeight })
+    api.barSize = Qt.binding(function() { return size || root.barHeight })
     api.activePopout = Qt.binding(function() { return root.activePopout })
     return api
   }
@@ -675,15 +694,15 @@ Item {
 
         // ----------------------------------------------- left ear, top level
         // Workspaces (occupied + active, accent when active), then the focused
-        // window's title, left-justified from the corner inset. Elides in the
-        // ear, never wraps.
+        // window's title, left-justified at island.left-padding. Elides in the
+        // island, never wraps.
         Island {
           id: leftIsland
-          x: root.cornerInset
+          x: root.leftPadding
           height: root.levelHeight
           padding: 0
           gap: root.statusSpacing
-          maxWidth: 2 * window.ears.leftCenter - root.cornerInset - root.notchInset
+          maxWidth: 2 * window.ears.leftCenter - 2 * root.leftPadding
           Row {
             id: workspaceRow
             anchors.verticalCenter: parent.verticalCenter
@@ -793,16 +812,24 @@ Item {
         }
 
         // -------------------------------------------- left ear, lower level
-        // Wi-Fi, Bluetooth, mic, agents: persistent status lights at the
-        // glyph size, right-justified against the notch (inset), so the two
-        // levels stagger.
+        // Everything else the bar has (inventoryIds, each widget drawing
+        // itself at the level's height), then Wi-Fi, Bluetooth, mic, agents,
+        // right-justified at island.left-padding from the notch, so the two
+        // levels stagger. Not trimmed to fit: if it is wider than the ear it
+        // runs past the island's left edge.
         Island {
           id: statusIsland
-          x: Math.round(2 * window.ears.leftCenter - root.notchInset - width)
+          x: Math.round(2 * window.ears.leftCenter - root.leftPadding - width)
           y: root.islandGap + root.levelHeight
           height: root.levelHeight
           padding: 0
           gap: root.statusSpacing
+          Hosts {
+            anchors.verticalCenter: parent.verticalCenter
+            shown: true
+            size: root.levelHeight
+            ids: root.inventoryIds
+          }
           StatusLight {
             target: "omarchy.network"
             text: root.netIcon
@@ -913,7 +940,7 @@ Item {
         // their element, so a panel drops from the island its icon lives in.
         Hosts {
           x: Math.round(window.ears.rightCenter)
-          ids: root.hostIds.filter(function(id) { return root.statusHostIds.indexOf(id) < 0 })
+          ids: root.rightHostIds
         }
         Hosts {
           x: Math.round(statusIsland.x + statusIsland.width / 2)
@@ -923,24 +950,28 @@ Item {
     }
   }
 
-  // An invisible home for hosted stock bar widgets: their panels drop from
-  // its x. One sits under the right island, one under the status lights.
-  component Hosts: Item {
+  // A home for hosted stock bar widgets. Hidden (default): invisible, 1px,
+  // so their panels drop from its x (one under the right ear, one under the
+  // status lights). Shown: the widgets draw themselves in a row at size.
+  component Hosts: Row {
+    id: hostRow
     property var ids: []
-    width: 1
-    height: root.barHeight
-    opacity: 0
-    enabled: false
+    property bool shown: false
+    property int size: root.barHeight
+    height: size
+    spacing: shown ? root.statusSpacing : 0
+    opacity: shown ? 1 : 0
+    enabled: shown
     Repeater {
-      model: parent.ids
+      model: hostRow.ids
       Loader {
         required property string modelData
-        width: 1
-        height: root.barHeight
+        width: hostRow.shown ? (item ? item.implicitWidth : 0) : 1
+        height: hostRow.size
         active: !!root.barWidgetRegistry && !!root.barWidgetRegistry.widgets[modelData]
         sourceComponent: active ? root.barWidgetRegistry.widgets[modelData].component : null
         onLoaded: {
-          if ("bar" in item) item.bar = root.apiFor(modelData)
+          if ("bar" in item) item.bar = root.apiFor(modelData, hostRow.size)
           if ("moduleName" in item) item.moduleName = modelData
           if ("settings" in item) item.settings = root.entrySettings(modelData)
           if (modelData === root.weatherId) root.weatherLoader = root.loaderIn(item)

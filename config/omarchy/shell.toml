@@ -83,6 +83,8 @@ radius                   = 13
 # overshoot.
 padding-x                = 36
 spacing                  = 38
+# Top bar v2: the left island's padding from the screen edge and the notch.
+left-padding             = 30
 # Faint static accent glow around every island-language outline (islands,
 # toasts, notifications, attached panels): alpha 0 turns it off; blur px.
 glow-alpha               = 0.32
