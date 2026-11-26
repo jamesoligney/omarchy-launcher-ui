@@ -32,14 +32,18 @@ Item {
   // Frame fill: the theme accent mixed into the background glass. The mix is
   // a token (frame.tint), so a light accent tint reads as a frame on a dark
   // wallpaper without becoming a solid orange bar. The fill alpha stays the
-  // launcher glass alpha; only the hue is tinted. The edge is the 1px line
-  // around the opening (frame.edge = 0 drops it).
-  readonly property real tint: num("frame.tint", 0.18)
-  readonly property real edgeAlpha: num("frame.edge", 0.16)
+  // launcher glass alpha; only the hue is tinted.
+  readonly property real tint: num("frame.tint", 0.22)
   readonly property color glass: Util.alpha(
     Qt.tint(Commons.Color.background, Util.alpha(Commons.Color.accent, tint)),
     num("launcher.panel-background-alpha", 0.70))
-  readonly property color edge: Util.alpha(Commons.Color.accent, edgeAlpha)
+  // Bevel (Stage 31): the opening's edge catches light on top and falls into
+  // shadow at the bottom -- one stroke on the hull side of the edge, shaded
+  // top to bottom: foreground highlight -> clear -> background shadow.
+  // Alphas are tokens; 0 drops that side.
+  readonly property color bevelLight: Util.alpha(Commons.Color.foreground, num("frame.bevel-light", 0.10))
+  readonly property color bevelDark: Util.alpha(Commons.Color.background, num("frame.bevel-dark", 0.30))
+  readonly property real bevelWidth: num("frame.bevel-width", 1)
 
   Variants {
     model: Quickshell.screens
@@ -64,7 +68,9 @@ Item {
           id: hull
           anchors.fill: parent
           property color glass: root.glass
-          property color edge: root.edge
+          property color bevelLight: root.bevelLight
+          property color bevelDark: root.bevelDark
+          property real bevelWidth: root.bevelWidth
           property int frameTop: root.frameTop
           property int frameLeft: root.frameLeft
           property int frameRight: root.frameRight
@@ -74,7 +80,9 @@ Item {
           property int notchW: screenScope.notched ? root.notchWidth : 0
           property int notchH: screenScope.notched ? root.notchHeight : 0
           onGlassChanged: requestPaint()
-          onEdgeChanged: requestPaint()
+          onBevelLightChanged: requestPaint()
+          onBevelDarkChanged: requestPaint()
+          onBevelWidthChanged: requestPaint()
           onFrameTopChanged: requestPaint()
           onFrameLeftChanged: requestPaint()
           onFrameRightChanged: requestPaint()
@@ -120,18 +128,21 @@ Item {
             ctx.fillStyle = rgba(glass)
             ctx.fill()
 
-            // The hull's inner edge, one continuous 1px accent line around
-            // the opening. The notch is a hole, not an outlined shape.
-            // frame.edge = 0 drops the line and leaves the fill edge as the
-            // hull boundary.
-            if (edge.a > 0) {
+            // The bevel sits just outside the opening, on the hull, so it
+            // never draws over the desktop.
+            if (bevelWidth > 0 && (bevelLight.a > 0 || bevelDark.a > 0)) {
+              var b = bevelWidth / 2
+              var top = frameTop - b, bottom = height - frameBottom + b
+              var shade = ctx.createLinearGradient(0, top, 0, bottom)
+              shade.addColorStop(0, rgba(bevelLight))
+              shade.addColorStop(0.5, rgba(Qt.rgba(bevelLight.r, bevelLight.g, bevelLight.b, 0)))
+              shade.addColorStop(0.5, rgba(Qt.rgba(bevelDark.r, bevelDark.g, bevelDark.b, 0)))
+              shade.addColorStop(1, rgba(bevelDark))
               ctx.beginPath()
-              rounded(ctx, frameLeft + 0.5, frameTop + 0.5,
-                width - frameLeft - frameRight - 1,
-                height - frameTop - frameBottom - 1,
-                Math.max(0, innerRadius - 0.5))
-              ctx.strokeStyle = rgba(edge)
-              ctx.lineWidth = 1
+              rounded(ctx, frameLeft - b, top, width - frameLeft - frameRight + bevelWidth,
+                bottom - top, innerRadius + b)
+              ctx.strokeStyle = shade
+              ctx.lineWidth = bevelWidth
               ctx.stroke()
             }
           }

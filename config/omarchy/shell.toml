@@ -16,10 +16,14 @@ bottom                   = 15
 radius                   = 20
 inner-radius             = 16
 # The fill mixes the theme accent into the background glass (0 = the old
-# dark glass, 1 = solid accent); the edge is the 1px line around the opening
-# (0 drops it). Stage 30: the fill covers the hull only; 0.22 reads at a glance.
+# dark glass, 1 = solid accent). Stage 30: the fill covers the hull only;
+# 0.22 reads at a glance.
 tint                     = 0.22
-edge                     = 0.0
+# Bevel on the opening's edge (Stage 31): a highlight from the foreground on
+# top fading to a shadow from the background at the bottom; alphas, 0 drops.
+bevel-light              = 0.10
+bevel-dark               = 0.35
+bevel-width              = 1
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
