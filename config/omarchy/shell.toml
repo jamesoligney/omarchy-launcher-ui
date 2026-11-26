@@ -19,12 +19,6 @@ inner-radius             = 16
 # dark glass, 1 = solid accent). Stage 30: the fill covers the hull only;
 # 0.22 reads at a glance.
 tint                     = 0.22
-# Bevel (Stage 34): the hull is high at the screen edge, ridges a quarter in
-# and slopes to the opening; light = foreground, dark = background. Strengths
-# apply to the top band; the narrow bands run at bevel-sides of them.
-bevel-light              = 0.15
-bevel-dark               = 0.30
-bevel-sides              = 0.5
 # The hull's boundary: 1px accent line around the opening (alpha, 0 drops).
 edge                     = 0.85
 
