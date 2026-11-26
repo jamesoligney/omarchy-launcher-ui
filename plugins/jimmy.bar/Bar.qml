@@ -307,9 +307,10 @@ Item {
   }
 
   // --------------------------------------------------- hosted panel widgets
-  // Hosted invisibly: the right ear's (clock, weather) and the status
-  // lights' widgets, so their panels and keys work and drop from them.
-  readonly property var rightHostIds: ["omarchy.clock", root.weatherId]
+  // Hosted invisibly: the right ear's (clock, weather, power: the battery's
+  // panel) and the status lights' widgets, so their panels and keys work and
+  // drop from them.
+  readonly property var rightHostIds: ["omarchy.clock", root.weatherId, "omarchy.power"]
   // Weather: the user clone (jimmy.weather: the bar's own icon set in its
   // panel) when installed, else stock. Either way it also answers to
   // "omarchy.weather", so leader W and `shell toggle omarchy.weather` work.
@@ -319,7 +320,7 @@ Item {
   // Shown in the left ear's lower level: every other widget the bar layout
   // (shell.json bar.layout, all sections) configures, in layout order. Only
   // what the bar already draws its own way, and dividers, are left out.
-  readonly property var drawnIds: ["omarchy.clock", "omarchy.weather", "jimmy.weather", "jimmy.workspaces",
+  readonly property var drawnIds: ["omarchy.clock", "omarchy.weather", "jimmy.weather", "omarchy.power", "jimmy.workspaces",
     "omarchy.workspaces", "jimmy.active-window", "omarchy.active-window", "io.github.nikhill-666.divider"]
   readonly property var inventoryIds: {
     var layout = barConfig && barConfig.layout ? barConfig.layout : {}, out = []

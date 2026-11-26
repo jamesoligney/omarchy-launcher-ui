@@ -11,27 +11,16 @@
           "verticalFormat": "HH\n—\nmm"
         }
       ],
-      "centerBegin": [
-        {
-          "id": "omarchy.indicators"
-        }
-      ],
+      "centerBegin": [],
       "centerEnd": [
         {
           "id": "jimmy.weather"
         },
         {
           "id": "omarchy.microphone"
-        },
-        {
-          "id": "omarchy.system-update"
         }
       ],
       "left": [
-        {
-          "id": "io.github.smoothpixels.glyph-menu",
-          "mark": "hyprland"
-        },
         {
           "id": "jimmy.workspaces"
         },
@@ -55,9 +44,6 @@
           "id": "omarchy.agents"
         },
         {
-          "id": "omarchy.keyboard-layout"
-        },
-        {
           "id": "omarchy.bluetooth"
         },
         {
@@ -65,10 +51,6 @@
         },
         {
           "id": "omarchy.audio"
-        },
-        {
-          "id": "omarchy.power",
-          "showPercentage": true
         }
       ],
       "tray": [
@@ -100,9 +82,6 @@
           "id": "lock-explorer",
           "source": "~/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/BarWidget.qml",
           "type": "qml"
-        },
-        {
-          "id": "jimmy.menu"
         }
       ]
     },
