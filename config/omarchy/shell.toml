@@ -3,8 +3,12 @@
 # eDP-1 so top and bottom reserved space are identical (see hypr/monitors.lua).
 [bar]
 size-horizontal = 32
-# Total top reserve while jimmy.bar is active (notch.height included).
-height                   = 48
+# Top bar v1: the bar's depth and the total top reserve (notch.height
+# included). Windows start below it.
+height                   = 75
+# The bar's fill: the launcher glass with the theme accent mixed in, enough
+# to see the bar and the notch cut out of it.
+tint                     = 0.22
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
@@ -64,6 +68,8 @@ width                    = 174
 inset                    = 10
 # Keep content clear of the display's rounded top corners.
 corner-inset             = 18
+# The cut-out's bottom corners in the bar fill.
+radius                   = 8
 
 
 [island]
@@ -93,16 +99,14 @@ glyph-size               = 20
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72
 
-[strip]
-# The left bar that holds the workspaces: its visible width (it sits one
-# island.gap off the edge; the reserve is gap + width), and its minimum
-# height as a share of the screen's height (it grows only if needed).
-width                    = 30
-min-height               = 0.5
+[primary]
+# The right ear's primaries (time, battery %, weather), larger than the rest.
+text-size                = 26
+glyph-size               = 28
 
 [status]
-# The status island's own padding and spacing (tighter than the main
-# islands: it is secondary and stays narrower). Glyphs use island.glyph-size.
+# Spacing between the left ear's status lights (and its top level's
+# elements). Glyphs use island.glyph-size. padding-x is unused since Top bar v1.
 padding-x                = 18
 spacing                  = 20
 
