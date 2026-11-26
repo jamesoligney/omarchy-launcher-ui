@@ -19,10 +19,11 @@ import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkMode
 // Top bar v1: one deep bar across the top (bar.height, 75), tinted from the
 // theme accent, with the camera notch cut out of it. The ears either side of
 // the notch are joined by the band below it.
-// Left ear: workspaces + focused app, one row, at island.left-padding (30).
-// Band below the notch (Top bar v3): every other bar widget the layout
-// configures (shown, not curated), then Wi-Fi / Bluetooth / mic / agents,
-// tight, centred under the cut-out.
+// Left ear, an island at island.left-padding (30) both ends, two levels:
+// workspaces + focused app on top (left-justified); below, right-justified
+// and tight, every other bar widget the layout configures (shown, not
+// curated), then Wi-Fi / Bluetooth / mic / agents (Top bar v4). The band
+// below the notch is plain bar fill.
 // Right ear: time, battery, weather (larger), contextual lights.
 // The stock panel widgets (audio, Bluetooth, network, power, display, clock,
 // weather, agents, microphone) are hosted here, invisible, so their panels and
@@ -68,8 +69,8 @@ Item {
   readonly property int notchRadius: num("notch.radius", 8)
   // The left island's padding from the screen edge and from the notch.
   readonly property int leftPadding: num("island.left-padding", 30)
-  // The band below the notch: the gap between its groups and lights, and
-  // between stock widgets (their slots carry their own padding).
+  // The second level: the gap between its groups and lights, and between
+  // stock widgets (their slots carry their own padding).
   readonly property int bandSpacing: num("band.spacing", 10)
   readonly property int bandWidgetSpacing: num("band.widget-spacing", 0)
   readonly property int batteryLow: num("battery.low", 20)
@@ -171,8 +172,8 @@ Item {
   readonly property bool micMuted: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].muted === true
   readonly property bool micInUse: !!hosts["omarchy.microphone"] && hosts["omarchy.microphone"].inUse === true
   property bool recording: false
-  // The band's width and the room for it (centred, between the left island
-  // and the right island), published by the bar window for status.
+  // The second level's width and the room for it in the left island,
+  // published by the bar window for status.
   property var band: ({})
   // Super+D leader (Hyprland submap "bar", bindings.lua): while it is held,
   // every element shows its letter.
@@ -810,17 +811,17 @@ Item {
 
         }
 
-        // ---------------------------------------------- band below the notch
+        // -------------------------------------------- left ear, lower level
         // Everything else the bar has (inventoryIds, each widget drawing
         // itself at the level's height), then Wi-Fi, Bluetooth, mic, agents:
-        // one tight row centred under the cut-out, from the notch's bottom to
-        // the bar's. Not trimmed to fit: if it is wider than the room between
-        // the left and right ears' contents, it says so (status: band).
+        // one tight row, right-justified at island.left-padding from the
+        // notch. Not trimmed to fit: if it is wider than the island it says
+        // so (status: band) and runs past the island's left edge.
         Island {
           id: statusIsland
-          x: Math.round((window.width - width) / 2)
-          y: screenScope.notched ? root.notchHeight : root.islandGap
-          height: root.barHeight - y
+          x: Math.round(2 * window.ears.leftCenter - root.leftPadding - width)
+          y: root.islandGap + root.levelHeight
+          height: root.levelHeight
           padding: 0
           gap: root.bandSpacing
           Hosts {
@@ -870,7 +871,7 @@ Item {
           target: root
           property: "band"
           value: ({ width: Math.round(statusIsland.width),
-            room: Math.round(2 * Math.min(window.width / 2 - leftIsland.x - leftIsland.width, rightIsland.x - window.width / 2)) })
+            room: Math.round(2 * window.ears.leftCenter - 2 * root.leftPadding) })
         }
 
         // Quick strip: outside the island, its right edge on the island's left

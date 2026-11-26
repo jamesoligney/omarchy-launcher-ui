@@ -102,8 +102,9 @@ glyph-size               = 20
 quiet-alpha              = 0.72
 
 [band]
-# The row below the notch (Top bar v3): gap between its groups and status
-# lights, and between stock widgets (their slots carry their own padding).
+# The left island's second level (Top bar v3 tightening, back left in v4):
+# gap between its groups and status lights, and between stock widgets
+# (their slots carry their own padding).
 spacing                  = 10
 widget-spacing           = 0
 
