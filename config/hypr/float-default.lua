@@ -11,15 +11,31 @@ local size = { o.float_default.width, o.float_default.height }
 -- floating can tell them from dialogs and apps that size themselves.
 local TAG = "float-default"
 
+-- Special workspaces lay their windows out themselves: the quake console is
+-- a half-height panel sized by its gaps, the scratchpad a full screen, the
+-- screensaver and share overlays their own. A workspace selector tells them
+-- apart as a class -- s[false] is every ordinary workspace -- so the default
+-- never reaches one, however it opens (Stage 27).
+local ORDINARY = "s[false]"
+
 -- Plain hl.window_rule, not o.window: o.window would file these matches in
 -- Omarchy's o.floating_apps, whose patterns its floating mode builds on.
+
+-- The stock picture-in-picture overlays keep their own place: the plain one is
+-- Omarchy's pip-tagged window, Google Meet's is its browser tag plus a
+-- "Meet - ..." title. Both get this marker, so one exact tag excludes them
+-- and no other window is touched. Stock gives them their own size, pin and
+-- corner (Stage 27).
+local PIP_TAG = "pip-meet"
+hl.window_rule({ match = { tag = "pip" }, tag = "+" .. PIP_TAG })
+hl.window_rule({ match = { tag = "chromium-based-browser", title = "^Meet - .+" }, tag = "+" .. PIP_TAG })
 
 -- Windows that open floating: Omarchy's floating-window tag (its terminals,
 -- btop, file pickers, previews, mpv, imv...). Loaded after Omarchy's
 -- defaults, so it replaces the stock 875x600. A rule matching `float = true`
 -- does not fire for windows floated by another rule, so the tag is the
 -- match; dialogs an app floats itself keep the size the app asks for.
-hl.window_rule({ match = { tag = "floating-window" }, size = size, center = true, tag = "+" .. TAG })
+hl.window_rule({ match = { tag = "floating-window", workspace = ORDINARY }, size = size, center = true, tag = "+" .. TAG })
 
 -- Floating is the default on every workspace (Stage 19): every new window
 -- opens floating at the default size, centred; tiling is the opt-in (Super+T).
@@ -37,6 +53,8 @@ hl.window_rule({
   match = {
     float = false,
     modal = false,
+    workspace = ORDINARY,
+    tag = "negative:pip-meet",
     class = own_floaters(o.floating_apps.class),
     title = own_floaters(o.floating_apps.title),
   },
@@ -70,6 +88,15 @@ end
 -- float size are also recognised by o.floating_apps, for older windows.
 local SELF_FLOATED = "self-floated"
 local FLOATING_WS = "omarchy-floating-workspace"
+-- A window the user floated with Super+T, as opposed to one the default
+-- floated as it opened. A special workspace keeps a manual float as it is;
+-- the default's float is given back to the workspace's own layout (Stage 27).
+local USER_FLOATED = "user-floated"
+
+local function special_workspace(workspace)
+  local id = workspace and tonumber(workspace.id)
+  return id ~= nil and id < 1
+end
 
 local function own_float_size()
   local set = {}
@@ -101,6 +128,21 @@ local function window_at(address)
 end
 
 hl.on("window.open", function(window)
+  local id = window.workspace and tonumber(window.workspace.id)
+  if id and id < 1 then
+    -- A stock workspace rule can move a window onto a special workspace after
+    -- the float rules have run (a share window, "special silent"). The
+    -- workspace lays it out itself: give back the default's float, and class
+    -- a window that floated there on its own as self-floated.
+    if window.floating and has_tag(window, TAG) and not has_tag(window, SELF_FLOATED)
+        and not has_tag(window, USER_FLOATED) and not window.pinned and (window.fullscreen or 0) == 0 then
+      hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. window.address }))
+    elseif window.floating and not has_tag(window, TAG) and not has_tag(window, "floating-window")
+        and not has_tag(window, "omarchy-mode-opened") then
+      hl.dispatch(hl.dsp.window.tag({ tag = "+" .. SELF_FLOATED, window = "address:" .. window.address }))
+    end
+    return
+  end
   if window.floating and not has_tag(window, TAG) and not has_tag(window, "floating-window")
       and not has_tag(window, "omarchy-mode-opened") then
     hl.dispatch(hl.dsp.window.tag({ tag = "+" .. SELF_FLOATED, window = "address:" .. window.address }))
@@ -186,14 +228,33 @@ local function after_mode(window)
     end
   end, { type = "oneshot", timeout = 30 })
 end
-hl.on("window.move_to_workspace", function(window) after_mode(window) end)
+hl.on("window.move_to_workspace", function(window, workspace)
+  -- A window carried onto a special workspace (Super+Shift+Grave,
+  -- Super+Alt+S) is laid out by that workspace, not floated at the default.
+  -- Only a window the default floated is given back: a manual float, a
+  -- dialog, a pinned or fullscreen window keeps the state it arrived with.
+  if special_workspace(workspace) and has_tag(window, TAG) and not has_tag(window, SELF_FLOATED)
+      and not has_tag(window, USER_FLOATED) and not window.pinned and (window.fullscreen or 0) == 0 then
+    local address = window.address
+    hl.timer(function()
+      local w = window_at(address)
+      local id = w and w.workspace and tonumber(w.workspace.id)
+      if id and id < 1 and w.floating and not w.pinned and (w.fullscreen or 0) == 0 then
+        hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. address }))
+      end
+    end, { type = "oneshot", timeout = 30 })
+  end
+  after_mode(window)
+end)
 hl.on("window.fullscreen", function(window) after_mode(window) end)
 
 -- Super+T (bindings.lua): floating a window gives it the default size,
 -- centred, the first time; after that it returns to the floating size and
 -- place it last had (Hyprland keeps the size but not the place), so a
 -- position the user set survives tiling and floating again. Per window, and
--- separate from the workspace reset above.
+-- separate from the workspace reset above. On a special workspace the window
+-- floats where it is: the workspace owns its layout and the default is not
+-- its to give.
 local last = {}  -- address -> { x, y, width, height } of its last float
 function o.float_toggle()
   local window = hl.get_active_window()
@@ -202,14 +263,29 @@ function o.float_toggle()
   if window.floating then
     last[address] = { window.at.x, window.at.y, window.size.x, window.size.y }
     hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+    hl.dispatch(hl.dsp.window.tag({ tag = "-" .. USER_FLOATED, window = "address:" .. address }))
     return
   end
   hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+  hl.dispatch(hl.dsp.window.tag({ tag = "+" .. USER_FLOATED, window = "address:" .. address }))
+  if special_workspace(window.workspace) then return end
   local g = last[address]
   if g then
     hl.dispatch(hl.dsp.window.resize({ x = g[3], y = g[4] }))
     hl.dispatch(hl.dsp.window.move({ x = g[1], y = g[2] }))
   else
     place(window)
+  end
+end
+
+-- A reload keeps windows as they are, so a normal app window already on a
+-- special workspace (the console's agent, opened before the rules above) is
+-- brought back to that workspace's layout once, on load. Same guards as a
+-- move: only the default's float is given back.
+for _, window in ipairs(hl.get_windows()) do
+  local id = window.workspace and tonumber(window.workspace.id)
+  if id and id < 1 and has_tag(window, TAG) and not has_tag(window, SELF_FLOATED)
+      and not has_tag(window, USER_FLOATED) and not window.pinned and (window.fullscreen or 0) == 0 then
+    hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. window.address }))
   end
 end
