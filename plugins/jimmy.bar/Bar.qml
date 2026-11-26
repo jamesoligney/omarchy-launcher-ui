@@ -16,14 +16,16 @@ import "../jimmy.shared/BarGeometry.js" as BarGeometry
 import "../jimmy.shared/WeatherIcons.js" as WeatherIcons
 import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkModel
 
-// Islands bar, Stage 3: islands live.
-// Left island (centred in the left ear): workspaces + focused app.
-// Right island (centred in the right ear): time, weather, battery, contextual
-// lights (stay awake, remote, screen record, mic), agents.
+// Bar on the frame, Stage 28: no pills.
+// The frame (jimmy.frame) is the background and owns the reserves; this
+// surface draws the top elements directly on it. Left row (centred in the
+// left ear): the focused app title. Right row (centred in the right ear):
+// time, battery, weather, contextual lights. Status row: Wi-Fi, Bluetooth,
+// mic, agents. Workspaces: numbers on the frame's left 30px band.
 // The stock panel widgets (audio, Bluetooth, network, power, display, clock,
 // weather, agents, microphone) are hosted here, invisible, so their panels and
-// keys (Super+Ctrl+A/B/N/P/D, Super+Ctrl+Alt+D) work and drop from the right
-// island. Every size is a token in ~/.config/omarchy/shell.toml.
+// keys (Super+Ctrl+A/B/N/P/D, Super+Ctrl+Alt+D) work and drop from the rows.
+// Every size is a token in ~/.config/omarchy/shell.toml.
 Item {
   id: root
 
@@ -44,23 +46,20 @@ Item {
   readonly property var tokens: Commons.Color.shellValues
   function num(key, fallback) { return Tokens.num(tokens, key, fallback) }
 
-  readonly property int barHeight: num("bar.height", 44)
-  readonly property int notchHeight: num("notch.height", 32)
+  readonly property int barHeight: num("bar.height", 75)
   readonly property int islandGap: num("island.gap", 3)
   readonly property int islandRadius: num("island.radius", 9)
   readonly property int islandPadding: num("island.padding-x", 10)
   readonly property int islandSpacing: num("island.spacing", 12)
   // Letters and numbers, and glyphs, sized apart (island.text-size,
-  // island.glyph-size). The status island's lights have their own size.
+  // island.glyph-size). The status row's lights have their own size.
   readonly property int textSize: num("island.text-size", 18)
   readonly property int glyphSize: num("island.glyph-size", 20)
   readonly property int statusPadding: num("status.padding-x", 18)
   readonly property int statusSpacing: num("status.spacing", 20)
   readonly property real quietAlpha: num("island.quiet-alpha", 0.72)
-  // The left strip (workspaces): its reserved width on the left edge.
-  readonly property int stripWidth: num("strip.width", 30)
-  // The strip bar's minimum height, as a share of the screen's height.
-  readonly property real stripMinHeight: num("strip.min-height", 0.5)
+  // The frame's left depth, where the workspace numbers sit.
+  readonly property int stripWidth: num("frame.left", 30)
   readonly property int batteryLow: num("battery.low", 20)
   readonly property int batteryCritical: num("battery.critical", 10)
   readonly property real nearLimit: num("agents.near-limit", 0.85)
@@ -80,7 +79,6 @@ Item {
 
   // Same glass as the launcher and pickers ([launcher] tokens).
   readonly property color islandColor: Util.alpha(Commons.Color.background, num("launcher.panel-background-alpha", 0.70))
-  readonly property color islandBorder: Util.alpha(Commons.Color.accent, num("launcher.panel-border-alpha", 0.16))
   readonly property color ink: Commons.Color.foreground
   readonly property color quiet: Util.alpha(Commons.Color.foreground, quietAlpha)
   readonly property color accent: Commons.Color.accent
@@ -117,7 +115,7 @@ Item {
   function toggleStayAwake() { if (idleService) idleService.setIdleEnabled(root.stayAwake) }
   function toggleSilence() { if (notificationService) notificationService.setDoNotDisturb(!root.silenced) }
   readonly property bool remoteActive: !!remoteService && remoteService.active === true
-  // Status island. Network: Wi-Fi by signal, ethernet, down (urgent) or
+  // Status row. Network: Wi-Fi by signal, ethernet, down (urgent) or
   // Wi-Fi off (dim). Bluetooth: off (dim), on, or a device connected (accent).
   readonly property var netDevices: Networking.devices ? Networking.devices.values : []
   function netDevice(type) {
@@ -160,14 +158,12 @@ Item {
   // leader.hints = false turns the letters (and the band they need) off.
   readonly property bool showHints: Tokens.str(tokens, "leader.hints", "true") !== "false"
   readonly property int hintSize: num("leader.hint-size", 11)
-  readonly property int glowBlur: num("island.glow-blur", 20)
   readonly property int jointGap: num("island.joint-gap", 4)
-  readonly property int jointRadius: num("island.joint-radius", 2)
   // Optical: shifts a capital so the edge crosses its middle (leader.hint-nudge).
   readonly property real hintNudge: num("leader.hint-nudge", -1)
 
   // Weather: the hosted stock weather widget fetches (stock source and
-  // interval); the island reads its loaded panel.
+  // interval); the row reads its loaded panel.
   // The weather widget's panel Loader, found once when the widget loads;
   // Loader.item notifies, so this follows it without re-scanning.
   property var weatherLoader: null
@@ -175,7 +171,7 @@ Item {
   // The panel's own icon comes only from open-meteo once coordinates are set,
   // and open-meteo refuses curl's default User-Agent on that request (403), so
   // derive it from the current conditions, which fall back to wttr.in.
-  // The island's own icon set (WeatherIcons.js): a condition key from the
+  // The row's own icon set (WeatherIcons.js): a condition key from the
   // same current reading the stock icon uses.
   readonly property string weatherIcon: weatherData ? WeatherIcons.key(weatherData.current) : ""
   Staleness {
@@ -266,7 +262,7 @@ Item {
     function toggle(id: string): bool { return root.toggleBarWidget(id) }
     // Super+Ctrl+Q: the quick-toggles pop-out, from the keyboard.
     function quick(): void { if (root.quickOpen && root.quickKeyboard) root.closeQuick(); else root.openQuick(true) }
-    // What the islands are showing, for checking from a terminal.
+    // What the rows are showing, for checking from a terminal.
     function status(): string {
       return JSON.stringify({
         hosted: Object.keys(root.hosts),
@@ -294,7 +290,7 @@ Item {
   // panel) when installed, else stock. Either way it also answers to
   // "omarchy.weather", so leader W and `shell toggle omarchy.weather` work.
   readonly property string weatherId: barWidgetRegistry && barWidgetRegistry.widgets["jimmy.weather"] ? "jimmy.weather" : "omarchy.weather"
-  // Panels for the status island's lights drop from the status island.
+  // Panels for the status row's lights drop from the status row.
   readonly property var statusHostIds: ["omarchy.network", "omarchy.bluetooth", "omarchy.microphone", "omarchy.agents"]
   property var hosts: ({})
   property var activePopout: null
@@ -377,31 +373,20 @@ Item {
   }
 
   // ------------------------------------------------------------- pieces
-  // An island. joinLeft / joinRight square the corners on that side to
-  // island.joint-radius, for two islands that read as one divided in two;
-  // such a pair glows as one (glow: false here, see rightPair).
-  component Island: Rectangle {
+  // A bar row on the frame. No glass, outline or glow of its own: the frame
+  // is the background. It keeps the same width, centre and padding the old
+  // islands had, so every element stays at the same x (Stage 28). The row
+  // fills the top frame depth, which centres its elements 13px lower.
+  component Island: Item {
     default property alias content: row.data
     property real centerX: 0
     property int maxWidth: 10000
     property int padding: root.islandPadding
     property int gap: root.islandSpacing
-    property bool joinLeft: false
-    property bool joinRight: false
-    property bool glow: true
     width: Math.min(maxWidth, row.implicitWidth + 2 * padding)
     height: root.islandHeight
     x: Math.round(centerX - width / 2)
     y: root.islandGap
-    radius: root.islandRadius
-    topLeftRadius: joinLeft ? root.jointRadius : radius
-    bottomLeftRadius: joinLeft ? root.jointRadius : radius
-    topRightRadius: joinRight ? root.jointRadius : radius
-    bottomRightRadius: joinRight ? root.jointRadius : radius
-    color: root.islandColor
-    border.width: 1
-    border.color: root.islandBorder
-    IslandGlow { visible: parent.glow && alpha > 0 }
     Row {
       id: row
       anchors.verticalCenter: parent.verticalCenter
@@ -410,9 +395,9 @@ Item {
     }
   }
 
-  // A status light in the status island: an island element like any other,
-  // at the glyph size, laid out by the island's row. It spans the island's
-  // height so its leader letter lands on the outline like the rest.
+  // A status light in the status row: an element like any other, at the
+  // glyph size, laid out by the row. It spans the row's height so its leader
+  // letter lands on the frame's bottom edge like the rest.
   component StatusLight: Item {
     property alias text: glyph.text
     property alias color: glyph.color
@@ -446,10 +431,10 @@ Item {
     textFormat: Text.PlainText
   }
 
-  // The leader key for an element: a small letter centred on the island's
-  // bottom outline under the element, so the edge cuts through it. Same line
+  // The leader key for an element: a small letter centred on the frame's
+  // bottom edge under the element, so the edge cuts through it. Same line
   // for every element; only while the leader is active. The parent must be
-  // vertically centred on the island (every island element is).
+  // vertically centred on the row (every element is).
   component Hint: Text {
     visible: root.showHints && root.leaderActive && text !== ""
     anchors.horizontalCenter: parent.horizontalCenter
@@ -568,72 +553,38 @@ Item {
         onTriggered: screenScope.hidden = screenScope.underFullscreen
       }
 
-      // Hyprland places a top-anchored layer below the monitor's own reserve
-      // (the notch rows from hypr/monitors.lua). The islands sit in those rows,
-      // so they ignore reserved space, and this invisible, click-through strip
-      // reserves the rest of bar.height. monitors.lua stays the same whichever
-      // bar is active.
-      PanelWindow {
-        screen: screenScope.modelData
-        anchors { top: true; left: true; right: true }
-        implicitHeight: 1
-        color: "transparent"
-        mask: Region {}
-        exclusionMode: ExclusionMode.Normal
-        exclusiveZone: Math.max(0, root.barHeight - (screenScope.notched ? root.notchHeight : 0))
-        WlrLayershell.namespace: "jimmy-bar-reserve"
-        WlrLayershell.layer: WlrLayer.Bottom
-      }
-
-      // ----------------------------------------------------- left strip
-      // Workspaces, in a bar on the left edge: the start of the frame. The
-      // same island as the top bar (glass, outline, glow, radius), vertical:
-      // strip.width wide, one island.gap off the edge as the top islands sit
-      // off the top, at least strip.min-height of the screen tall and taller
-      // only if the numbers need it, centred in the space below the top bar.
-      // The numbers float in its middle. The reserve is the bar's gap +
-      // width, so tiled windows keep Hyprland's usual gap after it. The layer
-      // is wider than the reserve so the glow is not cut off; only the bar
-      // takes the pointer. Hidden with the bar under fullscreen.
+      // ------------------------------------------------ left numbers
+      // Workspaces on the frame's left 30px band: no pill, no background,
+      // just the numbers, vertically centred. The frame reserves the band;
+      // this surface only draws them and takes the pointer on the numbers
+      // themselves. Hidden with the bar under fullscreen.
       PanelWindow {
         id: strip
         screen: screenScope.modelData
         visible: !screenScope.hidden
         anchors { top: true; bottom: true; left: true }
-        implicitWidth: root.islandGap + root.stripWidth + root.glowBlur
+        implicitWidth: root.stripWidth
         color: "transparent"
-        exclusionMode: ExclusionMode.Normal
-        exclusiveZone: root.islandGap + root.stripWidth
-        mask: Region { item: pill }
+        exclusionMode: ExclusionMode.Ignore
+        mask: Region { item: numbers }
         WlrLayershell.namespace: "jimmy-strip"
         WlrLayershell.layer: WlrLayer.Top
 
-        Rectangle {
-          id: pill
-          readonly property int inset: 3
-          readonly property real minHeight: Math.round((strip.screen ? strip.screen.height : 0) * root.stripMinHeight)
-          x: root.islandGap
+        Item {
+          id: numbers
           width: root.stripWidth
-          height: Math.min(strip.height, Math.max(minHeight, column.implicitHeight + 2 * inset))
+          height: column.implicitHeight
           anchors.verticalCenter: parent.verticalCenter
-          visible: screenScope.workspaces.length > 0
-          radius: Math.min(root.islandRadius, width / 2)
-          color: root.islandColor
-          border.width: 1
-          border.color: root.islandBorder
-          IslandGlow {}
           Column {
             id: column
-            anchors.centerIn: parent
+            width: parent.width
             spacing: 2
             Repeater {
               model: screenScope.workspaces
-              Rectangle {
+              Item {
                 required property var modelData
-                width: pill.width - 2 * pill.inset
+                width: numbers.width
                 height: width + 4
-                radius: root.islandRadius - 4
-                color: modelData.active ? Util.alpha(root.accent, 0.22) : "transparent"
                 Label {
                   anchors.centerIn: parent
                   text: String(parent.modelData.slot)
@@ -659,10 +610,8 @@ Item {
 
         anchors { top: true; left: true; right: true }
         // Taller than the bar by the leader letters' overhang below the
-        // islands; the input region stays the bar itself.
-        // Taller than the bar by the larger of the letters' overhang and the
-        // islands' glow, so neither is cut off.
-        implicitHeight: root.barHeight + Math.max(root.showHints ? root.hintSize : 0, root.glowBlur)
+        // frame; the input region stays the bar itself.
+        implicitHeight: root.barHeight + (root.showHints ? root.hintSize : 0)
         mask: Region { item: barInput }
         Item { id: barInput; width: window.width; height: root.barHeight }
         color: "transparent"
@@ -720,8 +669,6 @@ Item {
           id: rightIsland
           centerX: window.ears.rightCenter
           maxWidth: window.ears.maxIslandWidth
-          joinRight: true
-          glow: false
 
           // Time, nearest the notch. Click: calendar. Hover: the quick strip.
           Label {
@@ -786,20 +733,17 @@ Item {
 
         }
 
-        // ------------------------------------------------- status island
+        // ------------------------------------------------- status row
         // Wi-Fi, Bluetooth, mic, agents: persistent status lights at the
-        // glyph size, with the status island's own tighter padding and
-        // spacing (a secondary island stays narrower than the main one). Joined to the
-        // right island across island.joint-gap, the facing corners square,
-        // so the two read as one island divided; the right island keeps its
-        // centre in the ear, this one hangs off its right.
+        // glyph size, with the status row's own tighter padding and spacing
+        // (a secondary row stays narrower than the main one). It keeps the
+        // old joined x: island.joint-gap after the right row, hanging off
+        // its right, so every light stays where it was.
         Island {
           id: statusIsland
           x: rightIsland.x + rightIsland.width + root.jointGap
           padding: root.statusPadding
           gap: root.statusSpacing
-          joinLeft: true
-          glow: false
           StatusLight {
             target: "omarchy.network"
             text: root.netIcon
@@ -834,23 +778,13 @@ Item {
         }
         // Publish the islands' live centres for the toasts, notifications
         // and cards that hang from them (jimmy.shared/BarLayout): the right
-        // one spans the main island and the status island joined to it.
+        // one spans the main row and the status row.
         Binding { target: BarLayout; property: "rightCenter"; value: (rightIsland.x + statusIsland.x + statusIsland.width) / 2 }
         Binding { target: BarLayout; property: "leftCenter"; value: window.ears.leftCenter }
 
-        // One glow for the joined pair, the gap between them included.
-        Item {
-          z: -1
-          x: rightIsland.x
-          y: rightIsland.y
-          width: statusIsland.x + statusIsland.width - rightIsland.x
-          height: rightIsland.height
-          IslandGlow { cutouts: [rightIsland, statusIsland]; radius: root.islandRadius }
-        }
-
-        // Quick strip: outside the island, its right edge on the island's left
-        // edge, so opening it never moves the island. Items grow from zero
-        // width (slide out leftward); the zone reaches over the island's
+        // Quick strip: outside the right row, its right edge on the row's left
+        // edge, so opening it never moves the row. Items grow from zero
+        // width (slide out leftward); the zone reaches over the row's
         // padding to the time, so the pointer never crosses a gap.
         Item {
           x: rightIsland.x - stripRow.width
@@ -932,7 +866,7 @@ Item {
   }
 
   // An invisible home for hosted stock bar widgets: their panels drop from
-  // its x. One sits under the right island, one under the status island.
+  // its x. One sits under the right row, one under the status row.
   component Hosts: Item {
     property var ids: []
     width: 1

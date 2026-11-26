@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "jimmy.bar",
-  "name": "Islands bar",
-  "version": "0.2.0",
+  "name": "Frame bar",
+  "version": "0.3.0",
   "author": "Omarchy",
-  "description": "Top bar as two islands either side of the notch (bar restructure, Stage 2 mock)",
+  "description": "Bar elements drawn on the frame, no pills (Stage 28)",
   "kinds": [
     "bar"
   ],

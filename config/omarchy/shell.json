@@ -256,6 +256,9 @@
     },
     {
       "id": "jimmy.notifications"
+    },
+    {
+      "id": "jimmy.frame"
     }
   ],
   "version": 1

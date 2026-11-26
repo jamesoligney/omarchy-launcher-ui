@@ -8,15 +8,15 @@ local omarchy_monitor_scale = "auto"
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = omarchy_monitor_scale })
 -- eDP-1 is the 16" notch MacBook panel. Its cutout is 64 physical rows
 -- (/usr/share/omarchy-platform/display-cutouts.json) = 32 logical px at
--- scale 2, so reserve 32 at the top to clear the camera notch. The bar is
--- 32 tall (hypr/../omarchy/shell.toml bar.size-horizontal) and reserves the
--- same at the bottom, so top and bottom spacing match.
+-- scale 2. Hyprland's own reserve is zero here: the shell's frame surface
+-- (jimmy.frame) owns all four edges and reserves top 75, left 30, right 15,
+-- bottom 15 in one place, so nothing stacks (Stage 28).
 hl.monitor({
   output = "eDP-1",
   mode = "preferred",
   position = "auto",
   scale = 2,
-  reserved = { top = 32, right = 0, bottom = 0, left = 0 },
+  reserved = { top = 0, right = 0, bottom = 0, left = 0 },
 })
 
 -- Configure a specific monitor.
