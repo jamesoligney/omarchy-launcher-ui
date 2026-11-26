@@ -220,11 +220,11 @@
       "shimmerScaleMax": 1.45,
       "shimmerScaleMin": 0.75,
       "gradient": [
-        "rgba(ffc48aee)",
-        "rgba(ff5a1f00)"
+        "rgba(ff3437ee)",
+        "rgba(df003800)"
       ],
       "gradientPositions": "0 99",
-      "baseColor": "rgba(472a14dd)"
+      "baseColor": "rgba(470409dd)"
     },
     {
       "clock12": true,
@@ -256,9 +256,6 @@
     },
     {
       "id": "jimmy.notifications"
-    },
-    {
-      "id": "jimmy.frame"
     }
   ],
   "version": 1

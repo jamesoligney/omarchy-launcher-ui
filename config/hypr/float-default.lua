@@ -1,9 +1,9 @@
 -- Floating default (bar brief Q8, Stage 18): a window that floats starts at
 -- this size, centred on the monitor's usable area (below the bar's reserve).
 -- Change the size here, in one place. 1100x619 is measured from the Zen
--- window James sized by hand (Stage 20). Centred on the usable area after
--- the frame (left 30, top 75, right 15, bottom 15), it lands at about
--- (321, 279) (Stage 28; it was (329, 273) before the frame).
+-- window James sized by hand (Stage 20). Centred on the usable area (left
+-- of it the 30px workspace strip, above it the 48px bar), it lands at
+-- (329, 273) (Stage 24; it was (314, 273) before the strip).
 o.float_default = { width = 1100, height = 619 }
 
 local size = { o.float_default.width, o.float_default.height }

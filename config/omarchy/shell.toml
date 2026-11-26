@@ -1,26 +1,10 @@
 # Machine-level shell overrides (survives theme switches).
-# Bar thickness 32 logical px: matches the top notch cutout on eDP-1.
+# Bar thickness 32 logical px: matches the top notch cutout reservation on
+# eDP-1 so top and bottom reserved space are identical (see hypr/monitors.lua).
 [bar]
 size-horizontal = 32
-# Top frame depth the bar draws in (notch.height included). The frame owns
-# the reserve; this is the height the bar's elements centre in (Stage 28).
-height                   = 75
-
-[frame]
-# One hull around the desktop: the four depths it reserves, the outer corner
-# radius and the inner opening radius. The notch cutout comes from [notch].
-top                      = 75
-left                     = 30
-right                    = 15
-bottom                   = 15
-radius                   = 20
-inner-radius             = 16
-# The fill mixes the theme accent into the background glass (0 = the old
-# dark glass, 1 = solid accent). Stage 30: the fill covers the hull only;
-# 0.22 reads at a glance.
-tint                     = 0.22
-# The hull's boundary: 1px accent line around the opening (alpha, 0 drops).
-edge                     = 0.85
+# Total top reserve while jimmy.bar is active (notch.height included).
+height                   = 48
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
@@ -97,9 +81,10 @@ spacing                  = 38
 # toasts, notifications, attached panels): alpha 0 turns it off; blur px.
 glow-alpha               = 0.32
 glow-blur                = 20
-# Two bar rows joined as one (right + status): the gap between them (the
-# same x positions as the old joined pair).
+# Two islands joined as one divided in two (right + status): the gap between
+# them and the radius of the corners that face each other.
 joint-gap                = 4
+joint-radius             = 2
 # Letters and numbers in the islands (time, battery, app name, workspace
 # numbers), and glyphs (weather, lights, quick icons, the cup), sized apart.
 text-size                = 18
@@ -107,6 +92,13 @@ glyph-size               = 20
 # Quiet contract: everything but the active workspace, the app name and
 # contextual lights sits at this foreground opacity.
 quiet-alpha              = 0.72
+
+[strip]
+# The left bar that holds the workspaces: its visible width (it sits one
+# island.gap off the edge; the reserve is gap + width), and its minimum
+# height as a share of the screen's height (it grows only if needed).
+width                    = 30
+min-height               = 0.5
 
 [status]
 # The status island's own padding and spacing (tighter than the main
