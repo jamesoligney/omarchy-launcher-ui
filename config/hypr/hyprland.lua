@@ -58,3 +58,6 @@ pcall(require, "hypr.border-fx")
 
 -- No window shadow (see hypr/no-shadow.lua)
 require("hypr.no-shadow")
+
+-- omacast launcher bindings
+require("hypr.omacast")

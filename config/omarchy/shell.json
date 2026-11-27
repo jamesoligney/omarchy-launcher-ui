@@ -235,6 +235,9 @@
     },
     {
       "id": "jimmy.notifications"
+    },
+    {
+      "id": "typecraft.omacast"
     }
   ],
   "version": 1
