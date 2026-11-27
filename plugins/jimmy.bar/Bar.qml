@@ -19,11 +19,11 @@ import "/usr/share/omarchy/shell/plugins/panels/network/Model.js" as NetworkMode
 // Top bar v1: one deep bar across the top (bar.height, 75), tinted from the
 // theme accent, with the camera notch cut out of it. The ears either side of
 // the notch are joined by the band below it.
-// Left ear, an island at island.left-padding (30) both ends, two levels:
-// workspaces + focused app on top (left-justified); below, right-justified
-// and tight, every other bar widget the layout configures (shown, not
-// curated), then Wi-Fi / Bluetooth / mic / agents (Top bar v4). The band
-// below the notch is plain bar fill.
+// Left ear, an island at island.left-padding (30), two levels, both
+// left-justified (Top bar v6): the focused app's title on top; below, tight,
+// every other bar widget the layout configures (shown, not curated), then
+// Wi-Fi / Bluetooth / mic / agents. The workspaces sit centred in the band
+// below the notch.
 // Right ear: time, battery, weather (larger), contextual lights.
 // The stock panel widgets (audio, Bluetooth, network, power, display, clock,
 // weather, agents, microphone) are hosted here, invisible, so their panels and
@@ -694,9 +694,8 @@ Item {
 
 
         // ------------------------------------------------------- left ear
-        // Workspaces (occupied + active, accent when active), then the focused
-        // window's title, left-justified at island.left-padding. Elides in the
-        // island, never wraps.
+        // The focused window's title, left-justified at island.left-padding.
+        // Elides in the island, never wraps.
         Island {
           id: leftIsland
           x: root.leftPadding
@@ -704,6 +703,26 @@ Item {
           padding: 0
           gap: root.statusSpacing
           maxWidth: 2 * window.ears.leftCenter - 2 * root.leftPadding
+          Label {
+            visible: root.windowTitle !== ""
+            width: Math.min(implicitWidth, leftIsland.maxWidth)
+            elide: Text.ElideRight
+            text: root.windowTitle
+            color: root.ink
+          }
+        }
+
+
+        // ------------------------------------------- workspaces, under the notch
+        // Occupied + active workspaces (accent when active), centred under the
+        // cut-out in the band from the notch's bottom to the bar's (Top bar
+        // v6). Click one to go to it; leader Super+D then 1-9 also works.
+        Island {
+          id: workspaceIsland
+          x: Math.round((window.width - width) / 2)
+          y: screenScope.notched ? root.notchHeight : root.islandGap
+          height: root.barHeight - y
+          padding: 0
           Row {
             id: workspaceRow
             anchors.verticalCenter: parent.verticalCenter
@@ -730,15 +749,7 @@ Item {
               }
             }
           }
-          Label {
-            visible: root.windowTitle !== ""
-            width: Math.min(implicitWidth, leftIsland.maxWidth - workspaceRow.width - leftIsland.gap)
-            elide: Text.ElideRight
-            text: root.windowTitle
-            color: root.ink
-          }
         }
-
 
         Island {
           id: rightIsland
@@ -815,12 +826,12 @@ Item {
         // -------------------------------------------- left ear, lower level
         // Everything else the bar has (inventoryIds, each widget drawing
         // itself at the level's height), then Wi-Fi, Bluetooth, mic, agents:
-        // one tight row, right-justified at island.left-padding from the
-        // notch. Not trimmed to fit: if it is wider than the island it says
-        // so (status: band) and runs past the island's left edge.
+        // one tight row, left-justified at island.left-padding, under the
+        // title. Not trimmed to fit: if it is wider than the island it says
+        // so (status: band) and runs toward the notch.
         Island {
           id: statusIsland
-          x: Math.round(2 * window.ears.leftCenter - root.leftPadding - width)
+          x: root.leftPadding
           y: root.islandGap + root.levelHeight
           height: root.levelHeight
           padding: 0
