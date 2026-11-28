@@ -68,6 +68,9 @@ Item {
   readonly property int notchWidth: num("notch.width", 190)
   // The ears' inner bottom corners (Top bar v7): about the windows' rounding.
   readonly property int innerRadius: num("bar.inner-radius", 16)
+  // Where the centre's fade from black reaches clear (it starts at the
+  // notch's bottom).
+  readonly property int fadeEnd: num("bar.fade-end", 55)
   // The left island's padding from the screen edge and from the notch.
   readonly property int leftPadding: num("island.left-padding", 30)
   // The second level: the gap between its groups and lights, and between
@@ -611,6 +614,50 @@ Item {
         WlrLayershell.layer: WlrLayer.Bottom
       }
 
+      // The centre, under the notch (Top bar v7): solid black from the top of
+      // the screen to the notch's bottom, so the notch disappears, then eased
+      // to clear at bar.fade-end. Its own surface, so the glass blur on the
+      // bar's layer (menu-glass.lua: blur above alpha 0.2) cannot cut a seam
+      // across the fade. Click-through, below the bar's elements.
+      PanelWindow {
+        id: barCentre
+        screen: screenScope.modelData
+        visible: screenScope.notched && !screenScope.hidden
+        anchors { top: true }
+        implicitWidth: root.notchWidth
+        implicitHeight: root.barHeight
+        color: "transparent"
+        mask: Region {}
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.namespace: "jimmy-bar-centre"
+        WlrLayershell.layer: WlrLayer.Bottom
+        Canvas {
+          anchors.fill: parent
+          property int fadeEnd: root.fadeEnd
+          property int notchH: root.notchHeight
+          onFadeEndChanged: requestPaint()
+          onNotchHChanged: requestPaint()
+          onHeightChanged: requestPaint()
+          onPaint: {
+            // Smoothstep from the notch's bottom to fadeEnd: no kink where the
+            // fade starts or ends, sampled finely enough that the linear
+            // segments between stops never show.
+            var ctx = getContext("2d"), h = height, end = Math.min(h, fadeEnd)
+            ctx.clearRect(0, 0, width, h)
+            var fade = ctx.createLinearGradient(0, 0, 0, h)
+            fade.addColorStop(0, "rgba(0,0,0,1)")
+            for (var i = 0; i <= 16; i++) {
+              var t = i / 16
+              fade.addColorStop((notchH + t * (end - notchH)) / h,
+                "rgba(0,0,0," + (1 - t * t * (3 - 2 * t)).toFixed(4) + ")")
+            }
+            fade.addColorStop(1, "rgba(0,0,0,0)")
+            ctx.fillStyle = fade
+            ctx.fillRect(0, 0, width, h)
+          }
+        }
+      }
+
       PanelWindow {
         id: window
         screen: screenScope.modelData
@@ -663,9 +710,7 @@ Item {
         // glass, bar.height deep, outer bottom corners at island.radius; each
         // runs to the notch and its inner bottom corner curves back toward
         // its own side at bar.inner-radius, leaving a scooped valley of
-        // wallpaper. The centre, the notch's width, is solid black from the
-        // top of the screen to the notch's bottom, so the notch disappears,
-        // then fades to clear at the bar's bottom.
+        // wallpaper. The centre is its own surface (barCentre, below).
         Canvas {
           id: fill
           z: -1
@@ -693,14 +738,6 @@ Item {
             ear(ctx, w, x1, h, root.islandRadius, root.innerRadius)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, color.a)
             ctx.fill()
-            if (notchW > 0) {
-              var fade = ctx.createLinearGradient(0, 0, 0, h)
-              fade.addColorStop(0, "rgba(0,0,0,1)")
-              fade.addColorStop(notchH / h, "rgba(0,0,0,1)")
-              fade.addColorStop(1, "rgba(0,0,0,0)")
-              ctx.fillStyle = fade
-              ctx.fillRect(x0, 0, notchW, h)
-            }
           }
         }
 

@@ -11,6 +11,8 @@ height                   = 75
 tint                     = 0.22
 # Top bar v7: the ears' inner bottom corners, curving back from the notch.
 inner-radius             = 16
+# The centre's fade: black to the notch's bottom (y 32), eased to clear here.
+fade-end                 = 55
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
