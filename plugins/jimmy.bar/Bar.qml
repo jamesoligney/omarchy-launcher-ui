@@ -66,7 +66,8 @@ Item {
   readonly property int primaryText: num("primary.text-size", 26)
   readonly property int primaryGlyph: num("primary.glyph-size", 28)
   readonly property int notchWidth: num("notch.width", 174)
-  readonly property int notchRadius: num("notch.radius", 8)
+  // The ears' inner bottom corners (Top bar v7): about the windows' rounding.
+  readonly property int innerRadius: num("bar.inner-radius", 16)
   // The left island's padding from the screen edge and from the notch.
   readonly property int leftPadding: num("island.left-padding", 30)
   // The second level: the gap between its groups and lights, and between
@@ -658,9 +659,13 @@ Item {
         }
 
         // ------------------------------------------------------- the bar
-        // One flat tinted surface, bar.height deep, bottom corners rounded;
-        // the notch is a real cut-out (odd-even), its bottom corners at
-        // notch.radius, so the ears nest round it and meet in the band below.
+        // Three islands on one surface (Top bar v7). The ears are the tinted
+        // glass, bar.height deep, outer bottom corners at island.radius; each
+        // runs to the notch and its inner bottom corner curves back toward
+        // its own side at bar.inner-radius, leaving a scooped valley of
+        // wallpaper. The centre, the notch's width, is solid black from the
+        // top of the screen to the notch's bottom, so the notch disappears,
+        // then fades to clear at the bar's bottom.
         Canvas {
           id: fill
           z: -1
@@ -672,23 +677,30 @@ Item {
           onColorChanged: requestPaint()
           onNotchWChanged: requestPaint()
           onWidthChanged: requestPaint()
+          function ear(ctx, outer, inner, h, r, ri) {
+            // outer: the screen edge's x; inner: the notch edge's x.
+            var d = inner > outer ? 1 : -1
+            ctx.moveTo(outer, 0); ctx.lineTo(inner, 0); ctx.lineTo(inner, h - ri)
+            ctx.quadraticCurveTo(inner, h, inner - d * ri, h); ctx.lineTo(outer + d * r, h)
+            ctx.quadraticCurveTo(outer, h, outer, h - r); ctx.closePath()
+          }
           onPaint: {
-            var ctx = getContext("2d"), w = width, h = height, r = root.islandRadius
+            var ctx = getContext("2d"), w = width, h = height
+            var x0 = Math.round((w - notchW) / 2), x1 = x0 + notchW
             ctx.clearRect(0, 0, w, h)
             ctx.beginPath()
-            ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h - r)
-            ctx.quadraticCurveTo(w, h, w - r, h); ctx.lineTo(r, h)
-            ctx.quadraticCurveTo(0, h, 0, h - r); ctx.closePath()
-            if (notchW > 0) {
-              var x = Math.round((w - notchW) / 2), n = Math.min(root.notchRadius, notchH)
-              ctx.moveTo(x, 0); ctx.lineTo(x + notchW, 0); ctx.lineTo(x + notchW, notchH - n)
-              ctx.quadraticCurveTo(x + notchW, notchH, x + notchW - n, notchH)
-              ctx.lineTo(x + n, notchH); ctx.quadraticCurveTo(x, notchH, x, notchH - n)
-              ctx.closePath()
-            }
-            ctx.fillRule = Qt.OddEvenFill
+            ear(ctx, 0, x0, h, root.islandRadius, root.innerRadius)
+            ear(ctx, w, x1, h, root.islandRadius, root.innerRadius)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, color.a)
             ctx.fill()
+            if (notchW > 0) {
+              var fade = ctx.createLinearGradient(0, 0, 0, h)
+              fade.addColorStop(0, "rgba(0,0,0,1)")
+              fade.addColorStop(notchH / h, "rgba(0,0,0,1)")
+              fade.addColorStop(1, "rgba(0,0,0,0)")
+              ctx.fillStyle = fade
+              ctx.fillRect(x0, 0, notchW, h)
+            }
           }
         }
 

@@ -9,6 +9,8 @@ height                   = 75
 # The bar's fill: the launcher glass with the theme accent mixed in, enough
 # to see the bar and the notch cut out of it.
 tint                     = 0.22
+# Top bar v7: the ears' inner bottom corners, curving back from the notch.
+inner-radius             = 16
 
 # Launcher design tokens (phase 1 of the shell-wide refresh).
 # Colour values are role names resolved against the active theme's
@@ -68,8 +70,6 @@ width                    = 174
 inset                    = 10
 # Keep content clear of the display's rounded top corners.
 corner-inset             = 18
-# The cut-out's bottom corners in the bar fill.
-radius                   = 8
 
 
 [island]
