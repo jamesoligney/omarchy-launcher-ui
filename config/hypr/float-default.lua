@@ -1,5 +1,14 @@
 -- Floating default (bar brief Q8, Stage 18): a window that floats starts at
 -- this size, centred on the monitor's usable area (below the bar's reserve).
+--
+-- Inheritance (2026-11-27): a new window follows its workspace's mode. A
+-- fresh workspace starts floating (Omarchy's default workspace layout is set
+-- to floating: ~/.local/state/omarchy/workspace-layouts/default.lua), and
+-- Super+L moves it on to tiling or scrolling. On a floating workspace windows
+-- open, arrive and come back from fullscreen floating at this size, centred;
+-- on a tiled or scrolling one they tile. Omarchy's workspace-modes module
+-- does the floating and tiling; this file sizes what floats and tiles what
+-- the module does not own.
 -- Change the size here, in one place. 1100x619 is measured from the Zen
 -- window James sized by hand (Stage 20). Centred on the usable area (above
 -- it the 75px top bar, Top bar v1), it lands at (314, 286) (it was (330,
@@ -36,33 +45,6 @@ hl.window_rule({ match = { tag = "chromium-based-browser", title = "^Meet - .+" 
 -- does not fire for windows floated by another rule, so the tag is the
 -- match; dialogs an app floats itself keep the size the app asks for.
 hl.window_rule({ match = { tag = "floating-window", workspace = ORDINARY }, size = size, center = true, tag = "+" .. TAG })
-
--- Floating is the default on every workspace (Stage 19): every new window
--- opens floating at the default size, centred; tiling is the opt-in (Super+T).
--- Left alone: modal dialogs and windows Hyprland already floats (transient
--- dialogs, popups), which keep the size their app asks for, and apps with
--- float rules of their own (Omarchy's o.floating_apps: About, the
--- calculator...), which keep theirs. Rules apply as a window opens, so
--- windows already open are never moved.
-local function own_floaters(list)
-  local alternatives = {}
-  for _, pattern in ipairs(list) do table.insert(alternatives, "(?:" .. pattern .. ")") end
-  return #alternatives > 0 and "negative:" .. table.concat(alternatives, "|") or nil
-end
-hl.window_rule({
-  match = {
-    float = false,
-    modal = false,
-    workspace = ORDINARY,
-    tag = "negative:pip-meet",
-    class = own_floaters(o.floating_apps.class),
-    title = own_floaters(o.floating_apps.title),
-  },
-  float = true,
-  size = size,
-  center = true,
-  tag = "+" .. TAG,
-})
 
 local function place(window)
   local target = "address:" .. window.address
@@ -113,14 +95,13 @@ local function keeps_own_size(window, own)
   return (window.fullscreen or 0) ~= 0 or has_tag(window, SELF_FLOATED) or own[window.address]
 end
 
--- Every new app window ends at the default, however it mapped. The rules
--- above float it as it maps, but not every window lets them: one that asks
--- to open maximized (Helium remembers its last window as maximized) maps
--- tiled although Omarchy suppresses the maximize itself, and on a floating
--- workspace Omarchy's mode then floats it the stock way (its size, a
--- cascade), after this handler. So the window is classed at once, and a
--- moment later, once the mode has run, a normal app window on a regular
--- workspace is floated if it is still tiled and set to the default.
+-- A new app window on a floating workspace ends at the default, however it
+-- mapped: Omarchy's mode floats it the stock way (its size, a cascade), and
+-- one that asks to open maximized (Helium remembers its last window as
+-- maximized) can map tiled. So the window is classed at once, and a moment
+-- later, once the mode has run, a normal app window on a floating workspace
+-- is floated if still tiled and set to the default. On a tiled or scrolling
+-- workspace it is left to tile, Helium included.
 local function window_at(address)
   for _, w in ipairs(hl.get_windows()) do
     if w.address == address then return w end
@@ -152,7 +133,7 @@ hl.on("window.open", function(window)
   hl.timer(function()
     local w = window_at(address)
     local id = w and w.workspace and tonumber(w.workspace.id)
-    if not id or id < 1 or keeps_own_size(w, own_float_size()) then return end
+    if not id or id < 1 or not has_tag(w, FLOATING_WS) or keeps_own_size(w, own_float_size()) then return end
     if not w.floating then
       hl.dispatch(hl.dsp.window.float({ action = "on", window = "address:" .. address }))
     end
@@ -182,10 +163,9 @@ end
 
 -- The other way (Stage 24): a workspace switched to a tiled layout tiles
 -- its normal app windows. Omarchy's mode only tiles windows it floated
--- itself, and since floating became the default every new window floats on
--- its own account, so without this Super+L changed the layout while every
--- window stayed floating: nothing visibly happened. Dialogs, apps that size
--- themselves, fullscreen and pinned windows are left as they are.
+-- itself; this also tiles ones floated by Super+T or by the old global
+-- default. Dialogs, apps that size themselves, fullscreen and pinned windows
+-- are left as they are.
 local function tile_switched(spec)
   if type(spec) ~= "table" or not spec.workspace or spec.mode == "floating" then return end
   local own = own_float_size()
@@ -211,20 +191,25 @@ local modes = require("default.hypr.workspace-modes")
 o.workspace_mode = resetting(o.workspace_mode)
 modes.apply = resetting(modes.apply)
 
--- The mode also floats a tiled window that arrives on a floating workspace,
--- by being moved there or by leaving fullscreen, and places it the stock way
--- one tick later. The default wins there too: a little after the mode, a
--- window that came in tiled and is now floating on a floating workspace is
--- set to the default.
+-- A window arriving on a workspace, by being moved there or by leaving
+-- fullscreen, takes that workspace's mode. On a floating workspace the mode
+-- floats a tiled arrival and places it the stock way one tick later; the
+-- default wins: a little after the mode, it is set to the default. On a tiled
+-- or scrolling workspace the mode tiles only windows it floated itself, so a
+-- normal app window still floating there (Super+T, the old global default) is
+-- tiled. Dialogs, apps that size themselves, pinned and fullscreen windows
+-- keep their state.
 local function after_mode(window)
   local was_floating, address = window.floating, window.address
   hl.timer(function()
-    local now = hl.get_windows({ tag = FLOATING_WS })
-    for _, w in ipairs(now) do
-      if w.address == address and w.floating and not was_floating
-          and not keeps_own_size(w, own_float_size()) then
-        place(w)
-      end
+    local w = window_at(address)
+    local id = w and w.workspace and tonumber(w.workspace.id)
+    if not id or id < 1 or (w.fullscreen or 0) ~= 0 or keeps_own_size(w, own_float_size()) then return end
+    if has_tag(w, FLOATING_WS) then
+      if w.floating and not was_floating then place(w) end
+    elseif w.floating and not w.pinned then
+      hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. address }))
+      hl.dispatch(hl.dsp.window.tag({ tag = "-" .. USER_FLOATED, window = "address:" .. address }))
     end
   end, { type = "oneshot", timeout = 30 })
 end
@@ -248,7 +233,9 @@ hl.on("window.move_to_workspace", function(window, workspace)
 end)
 hl.on("window.fullscreen", function(window) after_mode(window) end)
 
--- Super+T (bindings.lua): floating a window gives it the default size,
+-- Super+T (bindings.lua): a per-window override of the workspace's mode,
+-- kept until the window moves to another workspace or its workspace's mode
+-- changes (both apply the mode again). Floating a window gives it the default size,
 -- centred, the first time; after that it returns to the floating size and
 -- place it last had (Hyprland keeps the size but not the place), so a
 -- position the user set survives tiling and floating again. Per window, and
