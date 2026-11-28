@@ -61,11 +61,10 @@ hint-font                = "JetBrainsMono Nerd Font"
 [notch]
 # Camera cutout on eDP-1. height: 64 physical rows from
 # /usr/share/omarchy-platform/display-cutouts.json = 32 logical (also the
-# monitor reserve in hypr/monitors.lua). width: 348 physical columns = 174,
-# the value notch-bar calibrated by eye for the same camera module;
-# provisional until read off the Stage 1 ruler.
-height                   = 32
-width                    = 174
+# monitor reserve in hypr/monitors.lua). width: 190, read by eye on the
+# notch ruler (James, 2026-11-27: 95 each side of centre, x 769-959); the
+# old 174 (348 physical columns, notch-bar's calibration) was provisional.
+width                    = 190
 # Clear space between an island and the notch edge.
 inset                    = 10
 # Keep content clear of the display's rounded top corners.

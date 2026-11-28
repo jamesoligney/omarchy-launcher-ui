@@ -65,7 +65,7 @@ Item {
   // The right ear's primaries (time, battery, weather) run larger.
   readonly property int primaryText: num("primary.text-size", 26)
   readonly property int primaryGlyph: num("primary.glyph-size", 28)
-  readonly property int notchWidth: num("notch.width", 174)
+  readonly property int notchWidth: num("notch.width", 190)
   // The ears' inner bottom corners (Top bar v7): about the windows' rounding.
   readonly property int innerRadius: num("bar.inner-radius", 16)
   // The left island's padding from the screen edge and from the notch.

@@ -9,7 +9,7 @@ function num(t, key, fallback) {
 }
 
 function ears(screenWidth, notched, t) {
-  var cutout = notched ? num(t, "notch.width", 174) : 0
+  var cutout = notched ? num(t, "notch.width", 190) : 0
   var inset = notched ? num(t, "notch.inset", 10) : 0
   var corner = num(t, "notch.corner-inset", 18)
   var half = screenWidth / 2

@@ -20,7 +20,7 @@ Item {
   property bool opened: false
 
   readonly property var tokens: Commons.Color.shellValues
-  readonly property real notchWidth: Tokens.num(tokens, "notch.width", 174)
+  readonly property real notchWidth: Tokens.num(tokens, "notch.width", 190)
   readonly property real notchHeight: Tokens.num(tokens, "notch.height", 32)
   readonly property real notchInset: Tokens.num(tokens, "notch.inset", 10)
   readonly property real cornerInset: Tokens.num(tokens, "notch.corner-inset", 18)
